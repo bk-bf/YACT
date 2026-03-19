@@ -16,11 +16,20 @@ interface MarketHighlights {
     topGainers: MarketCoin[];
 }
 
+interface CryptoHeadline {
+    id: string;
+    title: string;
+    url: string;
+    source: string;
+    publishedAt: string;
+}
+
 interface MarketsResponse {
     source: string;
     count: number;
     coins: MarketCoin[];
     global: GlobalMarketSummary;
+    headlines: CryptoHeadline[];
     highlights: MarketHighlights;
     stale?: boolean;
     warning?: string;
@@ -34,6 +43,7 @@ export const load: PageLoad = async ({ fetch }) => {
     return {
         coins: payload.coins,
         global: payload.global,
+        headlines: payload.headlines,
         highlights: payload.highlights,
         source: payload.source,
         stale: payload.stale ?? false,

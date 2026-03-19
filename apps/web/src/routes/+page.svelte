@@ -33,6 +33,21 @@
     signDisplay: "always",
   });
 
+  const headlineDate = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  function featuredHeadlines() {
+    return data.headlines.slice(0, 3);
+  }
+
+  function extraHeadlines() {
+    return data.headlines.slice(3);
+  }
+
   const sparklineWidth = 140;
   const sparklineHeight = 42;
 
@@ -67,6 +82,15 @@
       ? "chart-positive"
       : "chart-negative";
   }
+
+  function formatHeadlineDate(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    return headlineDate.format(date);
+  }
 </script>
 
 <svelte:head>
@@ -93,6 +117,64 @@
       </p>
     </div>
   </div>
+
+  <section class="news-section" aria-label="Top crypto headlines">
+    <div class="news-section-head">
+      <h2>Top Crypto Headlines</h2>
+      <span
+        >{featuredHeadlines().length} of {data.headlines.length} stories</span
+      >
+    </div>
+
+    {#if data.headlines.length === 0}
+      <p class="muted">No headlines available right now.</p>
+    {:else}
+      <ul class="news-list">
+        {#each featuredHeadlines() as headline}
+          <li>
+            <a
+              href={headline.url}
+              target="_blank"
+              rel="noreferrer"
+              class="news-link"
+            >
+              {headline.title}
+            </a>
+            <span class="news-meta"
+              >{headline.source} • {formatHeadlineDate(
+                headline.publishedAt,
+              )}</span
+            >
+          </li>
+        {/each}
+      </ul>
+
+      {#if extraHeadlines().length > 0}
+        <details class="news-more">
+          <summary>View more</summary>
+          <ul class="news-list news-list-extra">
+            {#each extraHeadlines() as headline}
+              <li>
+                <a
+                  href={headline.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  class="news-link"
+                >
+                  {headline.title}
+                </a>
+                <span class="news-meta"
+                  >{headline.source} • {formatHeadlineDate(
+                    headline.publishedAt,
+                  )}</span
+                >
+              </li>
+            {/each}
+          </ul>
+        </details>
+      {/if}
+    {/if}
+  </section>
 
   <div class="overview-grid">
     <article class="overview-stat-card">
