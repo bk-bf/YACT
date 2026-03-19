@@ -3,30 +3,13 @@ import { json } from '@sveltejs/kit';
 import {
     getCachedGasGwei,
     getFallbackGlobalMarketSummary,
-    getGlobalMarketSummary,
     getLatestGasGwei,
     getTopGainers,
-    getTrendingByVolume,
-    getTopMarketCoins
+    getTrendingByVolume
 } from '../../../lib/server/coingecko';
 import { getFallbackCryptoHeadlines, getTopCryptoHeadlines } from '../../../lib/server/headlines';
 import { ensureAutoRefreshStarted, refreshMarketsNow } from '../../../lib/server/autoRefreshService';
-import {
-    readPersistentMarketSnapshot,
-    writePersistentMarketSnapshot
-} from '../../../lib/server/persistentMarketSnapshot';
-
-async function persistSnapshotSafely(
-    source: string,
-    coins: Awaited<ReturnType<typeof getTopMarketCoins>>,
-    global: Awaited<ReturnType<typeof getGlobalMarketSummary>>
-): Promise<void> {
-    try {
-        await writePersistentMarketSnapshot(source, coins, global);
-    } catch (error) {
-        console.error('Failed to persist market snapshot:', error);
-    }
-}
+import { readPersistentMarketSnapshot } from '../../../lib/server/persistentMarketSnapshot';
 
 export async function GET({ fetch }) {
     ensureAutoRefreshStarted();
@@ -64,46 +47,21 @@ export async function GET({ fetch }) {
         });
     }
 
-    // Bootstrap path: if DB is empty, fetch once and seed it.
-    try {
-        const coins = await getTopMarketCoins(fetch);
-        const global = await getGlobalMarketSummary(fetch, coins);
-        const globalResolved = {
-            ...global,
-            gasGwei: gasGwei ?? global.gasGwei
-        };
-
-        await persistSnapshotSafely('coingecko-bootstrap', coins, globalResolved);
-
-        return json({
-            source: 'coingecko-bootstrap',
-            count: coins.length,
-            coins,
-            global: globalResolved,
+    // DB-only mode: never block request path on live upstream fetch.
+    return json(
+        {
+            source: 'db-unavailable',
+            count: 0,
+            coins: [],
+            global: getFallbackGlobalMarketSummary([]),
             headlines,
             highlights: {
-                trending: getTrendingByVolume(coins, 3),
-                topGainers: getTopGainers(coins, 3)
+                trending: [],
+                topGainers: []
             },
-            stale: false
-        });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return json(
-            {
-                source: 'db-unavailable',
-                count: 0,
-                coins: [],
-                global: getFallbackGlobalMarketSummary([]),
-                headlines,
-                highlights: {
-                    trending: [],
-                    topGainers: []
-                },
-                stale: true,
-                error: message
-            },
-            { status: 503 }
-        );
-    }
+            stale: true,
+            error: 'No persisted market snapshot available yet. Auto-refresh will populate DB when upstream succeeds.'
+        },
+        { status: 503 }
+    );
 }

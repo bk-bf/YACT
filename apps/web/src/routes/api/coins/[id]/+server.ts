@@ -1,10 +1,8 @@
 import { json } from '@sveltejs/kit';
 
 import { ensureAutoRefreshStarted, refreshCoinNow } from '../../../../lib/server/autoRefreshService';
-import { getCoinBreakdown } from '../../../../lib/server/coingecko';
 import {
     readCoinBreakdownSnapshot,
-    writeCoinBreakdownSnapshot
 } from '../../../../lib/server/persistentCoinSnapshot';
 
 const BREAKDOWN_STALE_MS = 10 * 60_000;
@@ -33,23 +31,12 @@ export async function GET({ fetch, params }) {
         });
     }
 
-    try {
-        const coin = await getCoinBreakdown(fetch, coinId);
-        await writeCoinBreakdownSnapshot(coinId, coin);
+    void refreshCoinNow(fetch, coinId);
 
-        return json({
-            coin,
-            stale: coin.source !== 'coingecko'
-        });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        const isNotFound = message.includes('status 404');
-
-        return json(
-            {
-                error: isNotFound ? `Coin '${coinId}' was not found.` : message
-            },
-            { status: isNotFound ? 404 : 502 }
-        );
-    }
+    return json(
+        {
+            error: `No persisted coin breakdown available for '${coinId}' yet. Auto-refresh will populate DB when upstream succeeds.`
+        },
+        { status: 503 }
+    );
 }

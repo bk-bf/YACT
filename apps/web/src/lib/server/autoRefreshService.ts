@@ -37,7 +37,9 @@ export async function refreshTrackedCoinData(fetchFn: typeof fetch): Promise<voi
             for (const range of CHART_RANGES) {
                 try {
                     const series = await getCoinChartSeries(fetchFn, coinId, range);
-                    await writeCoinChartSnapshot(coinId, range, series);
+                    if (series.source === 'coingecko') {
+                        await writeCoinChartSnapshot(coinId, range, series);
+                    }
                 } catch (error) {
                     console.warn(`${AUTO_REFRESH_LOG_PREFIX} chart refresh failed for ${coinId}/${range}:`, error);
                 }
@@ -89,7 +91,9 @@ export async function refreshCoinNow(fetchFn: typeof fetch, coinId: string): Pro
         for (const range of CHART_RANGES) {
             try {
                 const series = await getCoinChartSeries(fetchFn, coinId, range);
-                await writeCoinChartSnapshot(coinId, range, series);
+                if (series.source === 'coingecko') {
+                    await writeCoinChartSnapshot(coinId, range, series);
+                }
             } catch (error) {
                 console.warn(`${AUTO_REFRESH_LOG_PREFIX} ad-hoc chart refresh failed for ${coinId}/${range}:`, error);
             }

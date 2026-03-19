@@ -1,10 +1,9 @@
 import { json } from '@sveltejs/kit';
 
 import { ensureAutoRefreshStarted, refreshCoinNow } from '../../../../../lib/server/autoRefreshService';
-import { getCoinChartSeries, type CoinChartRange } from '../../../../../lib/server/coingecko';
+import type { CoinChartRange } from '../../../../../lib/server/coingecko';
 import {
     readCoinChartSnapshot,
-    writeCoinChartSnapshot
 } from '../../../../../lib/server/persistentCoinSnapshot';
 
 const VALID_RANGES: CoinChartRange[] = ['24h', '7d', '1m', '3m', 'ytd', '1y', 'max'];
@@ -38,37 +37,28 @@ export async function GET({ fetch, params, url }) {
     }
 
     const persisted = await readCoinChartSnapshot(coinId, rangeParam);
-    if (persisted) {
-        const ageMs = Date.now() - persisted.ts;
-        if (ageMs > CHART_STALE_MS[rangeParam]) {
-            void refreshCoinNow(fetch, coinId);
-        }
+    const persistedAgeMs = persisted ? Date.now() - persisted.ts : null;
+    const persistedIsFallback = persisted ? persisted.value.source !== 'coingecko' : false;
 
+    if (persisted && !persistedIsFallback && persistedAgeMs !== null && persistedAgeMs <= CHART_STALE_MS[rangeParam]) {
         return json({
             range: rangeParam,
             prices: persisted.value.prices,
             volumes: persisted.value.volumes,
             timestamps: persisted.value.timestamps,
             source: 'db-cache',
-            stale: ageMs > CHART_STALE_MS[rangeParam],
+            stale: false,
+            origin: persisted.value.source,
             snapshotTs: persisted.ts
         });
     }
 
-    try {
-        const series = await getCoinChartSeries(fetch, coinId, rangeParam);
-        await writeCoinChartSnapshot(coinId, rangeParam, series);
+    void refreshCoinNow(fetch, coinId);
 
-        return json({
-            range: rangeParam,
-            prices: series.prices,
-            volumes: series.volumes,
-            timestamps: series.timestamps,
-            source: series.source,
-            stale: series.source !== 'coingecko'
-        });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return json({ error: message }, { status: 502 });
-    }
+    return json(
+        {
+            error: `No persisted '${rangeParam}' chart snapshot available for '${coinId}' yet. Auto-refresh will populate DB when upstream succeeds.`
+        },
+        { status: 503 }
+    );
 }
