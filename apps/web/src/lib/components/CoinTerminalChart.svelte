@@ -21,7 +21,7 @@
         ChartRange,
         {
             label: string;
-            durationHours: number;
+            durationHours?: number;
             candleBuckets: number;
         }
     > = {
@@ -47,7 +47,7 @@
         },
         ytd: {
             label: "YTD",
-            durationHours: 24 * 180,
+            durationHours: 24 * 365,
             candleBuckets: 40,
         },
         "1y": {
@@ -57,7 +57,6 @@
         },
         max: {
             label: "MAX",
-            durationHours: 24 * 730,
             candleBuckets: 48,
         },
     };
@@ -65,9 +64,16 @@
     let chartMode = $state<ChartMode>("line");
     let chartRange = $state<ChartRange>("24h");
     let chartSeriesByRange = $state<
-        Partial<Record<ChartRange, { prices: number[]; volumes: number[] }>>
+        Partial<
+            Record<
+                ChartRange,
+                { prices: number[]; volumes: number[]; timestamps: number[] }
+            >
+        >
     >({});
     let chartFetchRequestId = 0;
+    let chartSvg: SVGSVGElement | null = null;
+    let hoveredIndex = $state<number | null>(null);
 
     const chartWidth = 1000;
     const chartHeight = 470;
@@ -96,6 +102,14 @@
     const shortDate = new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "numeric",
+    });
+
+    const hoverDateTime = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
     });
 
     function buildLinePath(values: number[], min: number, max: number): string {
@@ -216,6 +230,83 @@
         return { prices: safePrices, volumes };
     }
 
+    function buildSyntheticTimestamps(
+        pointCount: number,
+        durationHours: number,
+    ): number[] {
+        if (pointCount <= 0) {
+            return [];
+        }
+
+        const now = Date.now();
+        const start = now - durationHours * 3600 * 1000;
+        const step = pointCount > 1 ? (now - start) / (pointCount - 1) : 0;
+
+        return Array.from({ length: pointCount }, (_, index) =>
+            Math.round(start + step * index),
+        );
+    }
+
+    function getYtdDurationHours(): number {
+        const now = new Date();
+        const startOfYear = Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+        return Math.max(
+            24,
+            Math.floor((Date.now() - startOfYear) / (1000 * 60 * 60)),
+        );
+    }
+
+    function getRangeDurationHours(range: ChartRange, pointCount = 0): number {
+        if (range === "ytd") {
+            return getYtdDurationHours();
+        }
+
+        if (range === "max") {
+            const live = chartSeriesByRange.max?.timestamps;
+            if (live && live.length > 1) {
+                const first = live[0];
+                const last = live[live.length - 1];
+                const span = Math.floor((last - first) / (1000 * 60 * 60));
+                if (span > 0) {
+                    return span;
+                }
+            }
+
+            if (pointCount > 1) {
+                // MAX endpoint is typically daily granularity; derive span from points, not a fixed year cap.
+                return (pointCount - 1) * 24;
+            }
+
+            return 24 * 30;
+        }
+
+        return chartRangeConfig[range].durationHours ?? 24 * 7;
+    }
+
+    function updateHoverFromPointer(event: PointerEvent): void {
+        if (!chartSvg || filteredChartPrices.length < 2) {
+            hoveredIndex = null;
+            return;
+        }
+
+        const rect = chartSvg.getBoundingClientRect();
+        const svgX = ((event.clientX - rect.left) / rect.width) * chartWidth;
+        const clampedX = Math.min(
+            plotLeft + plotWidth,
+            Math.max(plotLeft, svgX),
+        );
+        const ratio = (clampedX - plotLeft) / plotWidth;
+        const index = Math.round(ratio * (filteredChartPrices.length - 1));
+        hoveredIndex = Math.min(
+            filteredChartPrices.length - 1,
+            Math.max(0, index),
+        );
+    }
+
+    function clearHover(): void {
+        hoveredIndex = null;
+    }
+
     const chartSeries = $derived.by(() => {
         const remote = chartSeriesByRange[chartRange];
         if (remote && remote.prices.length > 1) {
@@ -232,14 +323,61 @@
             return {
                 prices: fallbackPrices,
                 volumes: fallbackVolumes,
+                timestamps: buildSyntheticTimestamps(
+                    fallbackPrices.length,
+                    getRangeDurationHours(chartRange, fallbackPrices.length),
+                ),
             };
         }
 
-        return toFallbackSeries(fallbackPrices, coin.totalVolume24h);
+        const fallback = toFallbackSeries(fallbackPrices, coin.totalVolume24h);
+        return {
+            ...fallback,
+            timestamps: buildSyntheticTimestamps(
+                fallback.prices.length,
+                getRangeDurationHours(chartRange, fallback.prices.length),
+            ),
+        };
     });
 
     const filteredChartPrices = $derived(chartSeries.prices);
-    const filteredChartVolumes = $derived(chartSeries.volumes);
+    const filteredChartVolumes = $derived.by(() => {
+        if (chartSeries.volumes.length === filteredChartPrices.length) {
+            return chartSeries.volumes;
+        }
+
+        if (chartSeries.volumes.length > filteredChartPrices.length) {
+            return chartSeries.volumes.slice(
+                chartSeries.volumes.length - filteredChartPrices.length,
+            );
+        }
+
+        const seed =
+            chartSeries.volumes[chartSeries.volumes.length - 1] ??
+            coin.totalVolume24h / 24;
+        return [
+            ...chartSeries.volumes,
+            ...new Array(
+                filteredChartPrices.length - chartSeries.volumes.length,
+            ).fill(seed),
+        ];
+    });
+    const filteredChartTimestamps = $derived.by(() => {
+        if (chartSeries.timestamps.length === filteredChartPrices.length) {
+            return chartSeries.timestamps;
+        }
+
+        if (chartSeries.timestamps.length > filteredChartPrices.length) {
+            return chartSeries.timestamps.slice(
+                chartSeries.timestamps.length - filteredChartPrices.length,
+            );
+        }
+
+        return buildSyntheticTimestamps(
+            filteredChartPrices.length,
+            getRangeDurationHours(chartRange, filteredChartPrices.length),
+        );
+    });
 
     const chartMin = $derived(
         Math.min(...filteredChartPrices, coin.currentPrice),
@@ -276,9 +414,19 @@
             chartRangeConfig[chartRange].candleBuckets,
         ),
     );
-    const chartDurationHours = $derived(
-        chartRangeConfig[chartRange].durationHours,
-    );
+    const chartDurationHours = $derived.by(() => {
+        if (filteredChartTimestamps.length > 1) {
+            const first = filteredChartTimestamps[0];
+            const last =
+                filteredChartTimestamps[filteredChartTimestamps.length - 1];
+            const spanHours = Math.floor((last - first) / (1000 * 60 * 60));
+            if (spanHours > 0) {
+                return spanHours;
+            }
+        }
+
+        return getRangeDurationHours(chartRange, filteredChartPrices.length);
+    });
     const xTickLabels = $derived(
         Array.from({ length: 6 }, (_, idx) =>
             formatTickTime(idx, 6, chartDurationHours),
@@ -290,6 +438,67 @@
             ((scaledMax - currentPriceValue) / (scaledMax - scaledMin || 1)) *
                 priceHeight,
     );
+    const hoverX = $derived.by(() => {
+        if (hoveredIndex === null || filteredChartPrices.length < 2) {
+            return null;
+        }
+
+        return (
+            plotLeft +
+            (plotWidth * hoveredIndex) /
+                Math.max(filteredChartPrices.length - 1, 1)
+        );
+    });
+    const hoverPrice = $derived(
+        hoveredIndex === null
+            ? null
+            : (filteredChartPrices[hoveredIndex] ?? null),
+    );
+    const hoverVolume = $derived(
+        hoveredIndex === null
+            ? null
+            : (filteredChartVolumes[hoveredIndex] ?? null),
+    );
+    const hoverTimestamp = $derived(
+        hoveredIndex === null
+            ? null
+            : (filteredChartTimestamps[hoveredIndex] ?? null),
+    );
+    const hoverPointY = $derived.by(() => {
+        if (hoverPrice === null) {
+            return null;
+        }
+
+        return (
+            plotTop +
+            ((scaledMax - hoverPrice) / (scaledMax - scaledMin || 1)) *
+                priceHeight
+        );
+    });
+    const hoverTooltipX = $derived.by(() => {
+        if (hoverX === null) {
+            return null;
+        }
+
+        return Math.min(chartWidth - 150, Math.max(150, hoverX));
+    });
+    const hoverTooltipY = $derived.by(() => {
+        if (hoverPointY === null) {
+            return null;
+        }
+
+        return Math.min(
+            priceHeight + plotTop - 20,
+            Math.max(plotTop + 16, hoverPointY - 78),
+        );
+    });
+    const hoverDateLabel = $derived.by(() => {
+        if (hoverTimestamp === null) {
+            return "";
+        }
+
+        return hoverDateTime.format(new Date(hoverTimestamp));
+    });
 
     $effect(() => {
         if (!browser) {
@@ -297,12 +506,14 @@
         }
 
         const range = chartRange;
-        if (chartSeriesByRange[range]?.prices.length) {
+        if (range !== "max" && chartSeriesByRange[range]?.prices.length) {
             return;
         }
 
         const requestId = ++chartFetchRequestId;
-        void fetch(`/api/coins/${coin.id}/chart?range=${range}`)
+        void fetch(`/api/coins/${coin.id}/chart?range=${range}&_ts=${Date.now()}`, {
+            cache: "no-store",
+        })
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error(
@@ -313,6 +524,7 @@
                 const payload = (await response.json()) as {
                     prices?: number[];
                     volumes?: number[];
+                    timestamps?: number[];
                 };
 
                 const prices =
@@ -326,6 +538,14 @@
                     payload.volumes?.filter((value) =>
                         Number.isFinite(value),
                     ) ?? toFallbackSeries(prices, coin.totalVolume24h).volumes;
+                const timestamps =
+                    payload.timestamps?.filter((value) =>
+                        Number.isFinite(value),
+                    ) ??
+                    buildSyntheticTimestamps(
+                        prices.length,
+                        getRangeDurationHours(range, prices.length),
+                    );
 
                 chartSeriesByRange = {
                     ...chartSeriesByRange,
@@ -336,6 +556,16 @@
                                 ? volumes
                                 : toFallbackSeries(prices, coin.totalVolume24h)
                                       .volumes,
+                        timestamps:
+                            timestamps.length === prices.length
+                                ? timestamps
+                                : buildSyntheticTimestamps(
+                                      prices.length,
+                                      getRangeDurationHours(
+                                          range,
+                                          prices.length,
+                                      ),
+                                  ),
                     },
                 };
             })
@@ -390,10 +620,13 @@
 
         <div class="coin-widget-wrap" aria-label={`${coin.name} custom chart`}>
             <svg
+                bind:this={chartSvg}
                 viewBox={`0 0 ${chartWidth} ${chartHeight}`}
                 class="coin-custom-chart"
                 role="img"
                 aria-label={`${coin.name} price and volume chart`}
+                onpointermove={updateHoverFromPointer}
+                onpointerleave={clearHover}
             >
                 <defs>
                     <linearGradient
@@ -503,6 +736,22 @@
                     {/each}
                 {/if}
 
+                {#if hoverX !== null && hoverPointY !== null}
+                    <line
+                        x1={hoverX}
+                        x2={hoverX}
+                        y1={plotTop}
+                        y2={volumeTop + volumeHeight}
+                        class="coin-hover-crosshair"
+                    />
+                    <circle
+                        cx={hoverX}
+                        cy={hoverPointY}
+                        r="4.2"
+                        class="coin-hover-dot"
+                    />
+                {/if}
+
                 <line
                     x1={plotLeft}
                     x2={plotLeft + plotWidth}
@@ -519,12 +768,14 @@
                     class={`coin-current-pill ${isPositive ? "positive" : "negative"}`}
                 />
                 <text
-                    x={plotLeft + plotWidth + 48}
-                    y={currentPriceY + 5}
+                    x={plotLeft + plotWidth + 60}
+                    y={currentPriceY}
                     text-anchor="middle"
                     class="coin-current-pill-text"
                 >
-                    {compactUsd.format(currentPriceValue)}
+                    <tspan dy="0.32em"
+                        >{compactUsd.format(currentPriceValue)}</tspan
+                    >
                 </text>
 
                 <rect
@@ -542,7 +793,7 @@
                         y={volumeTop + (volumeHeight - barH)}
                         width={Math.max(0.8, barWidth - 0.8)}
                         height={barH}
-                        class="coin-volume-bar"
+                        class={`coin-volume-bar ${hoveredIndex === idx ? "hovered" : ""}`}
                     />
                 {/each}
 
@@ -572,6 +823,23 @@
                 />
                 <path d={overviewPath} class="coin-overview-line" />
             </svg>
+
+            {#if hoverTooltipX !== null && hoverTooltipY !== null && hoverPrice !== null && hoverVolume !== null}
+                <div
+                    class="coin-hover-tooltip"
+                    style={`left: ${(hoverTooltipX / chartWidth) * 100}%; top: ${(hoverTooltipY / chartHeight) * 100}%;`}
+                >
+                    <p class="coin-hover-tooltip-date">{hoverDateLabel}</p>
+                    <p class="coin-hover-tooltip-row">
+                        <span>Price</span>
+                        <strong>{compactUsd.format(hoverPrice)}</strong>
+                    </p>
+                    <p class="coin-hover-tooltip-row">
+                        <span>Vol</span>
+                        <strong>{compactUsd.format(hoverVolume)}</strong>
+                    </p>
+                </div>
+            {/if}
         </div>
     </div>
 </article>

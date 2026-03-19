@@ -1,4 +1,5 @@
 import type { MarketCoin } from '../types/market';
+import { readPersistentMarketSnapshot } from './persistentMarketSnapshot';
 
 const COINGECKO_MARKETS_ENDPOINT =
     'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true&price_change_percentage=24h';
@@ -157,6 +158,7 @@ export type CoinChartRange = '24h' | '7d' | '1m' | '3m' | 'ytd' | '1y' | 'max';
 export interface CoinChartSeries {
     prices: number[];
     volumes: number[];
+    timestamps: number[];
     source: 'coingecko' | 'coingecko-cache';
 }
 
@@ -335,14 +337,14 @@ async function fetchCoinChartWithRetry(
 async function fetchCoinChartRangeWithRetry(
     fetchFn: typeof fetch,
     coinId: string,
-    fromUnixSec: number,
-    toUnixSec: number,
+    from: string,
+    to: string,
     interval?: 'hourly' | 'daily'
 ): Promise<Response> {
     const query = new URLSearchParams({
         vs_currency: 'usd',
-        from: String(fromUnixSec),
-        to: String(toUnixSec)
+        from,
+        to
     });
 
     if (interval) {
@@ -370,6 +372,11 @@ async function fetchCoinChartRangeWithRetry(
     });
 }
 
+function toIsoMinuteString(date: Date): string {
+    // CoinGecko docs recommend ISO date strings for best compatibility.
+    return date.toISOString().slice(0, 16);
+}
+
 function syntheticVolumesFromPrices(prices: number[], totalVolume24h: number): number[] {
     const base = totalVolume24h / 24;
     return prices.map((price, index, arr) => {
@@ -383,14 +390,37 @@ function syntheticVolumesFromPrices(prices: number[], totalVolume24h: number): n
     });
 }
 
-const COIN_CHART_RANGE_CONFIG: Record<CoinChartRange, { durationHours?: number; days?: string | number; interval?: 'hourly' | 'daily' }> = {
-    '24h': { durationHours: 24, interval: 'hourly' },
-    '7d': { durationHours: 24 * 7, interval: 'hourly' },
-    '1m': { durationHours: 24 * 30, interval: 'hourly' },
-    '3m': { durationHours: 24 * 90, interval: 'hourly' },
-    ytd: { durationHours: 24 * 365, interval: 'daily' },
-    '1y': { durationHours: 24 * 365, interval: 'daily' },
-    max: { days: 'max', interval: 'daily' }
+function buildSyntheticTimestamps(count: number, durationHours: number): number[] {
+    if (count <= 0) {
+        return [];
+    }
+
+    const nowMs = Date.now();
+    const startMs = nowMs - durationHours * 3600 * 1000;
+    const stepMs = count > 1 ? (nowMs - startMs) / (count - 1) : 0;
+
+    return Array.from({ length: count }, (_, index) => Math.round(startMs + index * stepMs));
+}
+
+function getYtdDurationHours(): number {
+    const now = new Date();
+    const startOfYear = Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+    return Math.max(24, Math.floor((Date.now() - startOfYear) / (1000 * 60 * 60)));
+}
+
+const COIN_CHART_RANGE_CONFIG: Record<
+    CoinChartRange,
+    { durationHours?: number; days?: string | number; fromUnixSec?: number; interval?: 'hourly' | 'daily' }
+> = {
+    // Leave interval undefined to let CoinGecko auto-select granularity per plan/range.
+    '24h': { durationHours: 24 },
+    '7d': { durationHours: 24 * 7 },
+    '1m': { durationHours: 24 * 30 },
+    '3m': { durationHours: 24 * 90 },
+    ytd: { durationHours: 24 * 365 },
+    '1y': { durationHours: 24 * 365 },
+    // Fetch full available history with explicit range bounds.
+    max: { fromUnixSec: 0 }
 };
 
 function firstNonEmpty(values: string[] | undefined): string | null {
@@ -451,6 +481,20 @@ function toCoinBreakdownFromCache(coin: MarketCoin): CoinBreakdown {
         chartVolumes7d: syntheticVolumes,
         source: 'coingecko-cache'
     };
+}
+
+async function getCachedOrPersistentCoin(coinId: string): Promise<MarketCoin | null> {
+    const cachedCoin = getCachedTopMarketCoins()?.coins.find((coin) => coin.id === coinId) ?? null;
+    if (cachedCoin) {
+        return cachedCoin;
+    }
+
+    const persistent = await readPersistentMarketSnapshot();
+    if (!persistent) {
+        return null;
+    }
+
+    return persistent.coins.find((coin) => coin.id === coinId) ?? null;
 }
 
 export function getCachedTopMarketCoins(): MarketCache | null {
@@ -644,7 +688,7 @@ export async function getTopMarketCoins(fetchFn: typeof fetch): Promise<MarketCo
 }
 
 export async function getCoinBreakdown(fetchFn: typeof fetch, coinId: string): Promise<CoinBreakdown> {
-    const cachedCoin = getCachedTopMarketCoins()?.coins.find((coin) => coin.id === coinId) ?? null;
+    const cachedCoin = await getCachedOrPersistentCoin(coinId);
 
     try {
         const [detailResponse, chartResponse] = await Promise.all([
@@ -732,27 +776,40 @@ export async function getCoinChartSeries(
     range: CoinChartRange
 ): Promise<CoinChartSeries> {
     const config = COIN_CHART_RANGE_CONFIG[range];
-    const cachedCoin = getCachedTopMarketCoins()?.coins.find((coin) => coin.id === coinId) ?? null;
+    const cachedCoin = await getCachedOrPersistentCoin(coinId);
 
     try {
         const nowUnixSec = Math.floor(Date.now() / 1000);
+        const nowIso = toIsoMinuteString(new Date(nowUnixSec * 1000));
 
         let response: Response;
-        if (config.days !== undefined) {
+        if (config.fromUnixSec !== undefined) {
+            response = await withTimeout(
+                fetchCoinChartRangeWithRetry(
+                    fetchFn,
+                    coinId,
+                    toIsoMinuteString(new Date(config.fromUnixSec * 1000)),
+                    nowIso,
+                    config.interval
+                ),
+                6_000
+            );
+        } else if (config.days !== undefined) {
             response = await withTimeout(
                 fetchCoinChartWithRetry(fetchFn, coinId, config.days, config.interval),
                 6_000
             );
         } else {
-            const ytdDurationHours = (() => {
-                const now = new Date();
-                const startOfYear = Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
-                return Math.max(24, Math.floor((Date.now() - startOfYear) / (1000 * 60 * 60)));
-            })();
-            const durationHours = range === 'ytd' ? ytdDurationHours : (config.durationHours ?? 24 * 7);
+            const durationHours = range === 'ytd' ? getYtdDurationHours() : (config.durationHours ?? 24 * 7);
             const fromUnixSec = nowUnixSec - durationHours * 3600;
             response = await withTimeout(
-                fetchCoinChartRangeWithRetry(fetchFn, coinId, fromUnixSec, nowUnixSec, config.interval),
+                fetchCoinChartRangeWithRetry(
+                    fetchFn,
+                    coinId,
+                    toIsoMinuteString(new Date(fromUnixSec * 1000)),
+                    nowIso,
+                    config.interval
+                ),
                 6_000
             );
         }
@@ -762,7 +819,12 @@ export async function getCoinChartSeries(
         }
 
         const payload = (await response.json()) as CoinGeckoMarketChartResponse;
-        const prices = payload.prices?.map(([, price]) => price).filter((price) => Number.isFinite(price)) ?? [];
+        const priceEntries = payload.prices?.filter(
+            (entry): entry is [number, number] =>
+                Array.isArray(entry) && entry.length === 2 && Number.isFinite(entry[0]) && Number.isFinite(entry[1])
+        ) ?? [];
+        const prices = priceEntries.map(([, price]) => price);
+        const timestamps = priceEntries.map(([timestamp]) => timestamp);
         const volumes = payload.total_volumes
             ?.map(([, volume]) => volume)
             .filter((volume) => Number.isFinite(volume)) ?? [];
@@ -774,6 +836,7 @@ export async function getCoinChartSeries(
         return {
             prices,
             volumes: volumes.length > 1 ? volumes : syntheticVolumesFromPrices(prices, cachedCoin?.totalVolume24h ?? 0),
+            timestamps,
             source: 'coingecko'
         };
     } catch {
@@ -781,10 +844,14 @@ export async function getCoinChartSeries(
             const fallbackPrices = cachedCoin.sparkline7d.length > 1
                 ? cachedCoin.sparkline7d
                 : [cachedCoin.currentPrice, cachedCoin.currentPrice];
+            const fallbackDurationHours = range === 'ytd'
+                ? getYtdDurationHours()
+                : (COIN_CHART_RANGE_CONFIG[range].durationHours ?? 24 * 365 * 2);
 
             return {
                 prices: fallbackPrices,
                 volumes: syntheticVolumesFromPrices(fallbackPrices, cachedCoin.totalVolume24h),
+                timestamps: buildSyntheticTimestamps(fallbackPrices.length, fallbackDurationHours),
                 source: 'coingecko-cache'
             };
         }

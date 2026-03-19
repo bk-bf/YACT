@@ -866,6 +866,8 @@ a {
 
 .coin-chart-shell {
     border: 0;
+    position: relative;
+    overflow: visible;
     background:
         radial-gradient(circle at 84% 14%, rgba(255, 255, 255, 0.04), transparent 46%),
         linear-gradient(180deg, #050505, #030303 52%, #010101);
@@ -948,7 +950,7 @@ a {
     min-height: 34rem;
     position: relative;
     background: linear-gradient(180deg, #050505 0%, #020202 100%);
-    overflow: hidden;
+    overflow: visible;
     margin-left: 0;
 }
 
@@ -1043,6 +1045,57 @@ a {
 
 .coin-volume-bar {
     fill: rgba(143, 143, 143, 0.55);
+}
+
+.coin-volume-bar.hovered {
+    fill: rgba(198, 198, 198, 0.82);
+}
+
+.coin-hover-crosshair {
+    stroke: rgba(124, 196, 148, 0.92);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+}
+
+.coin-hover-dot {
+    fill: #3dde87;
+    stroke: #021b0d;
+    stroke-width: 1.2;
+}
+
+.coin-hover-tooltip {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    min-width: 188px;
+    border: 1px solid #2f3a33;
+    border-radius: 9px;
+    background: rgba(14, 19, 18, 0.95);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    padding: 0.52rem 0.62rem;
+    pointer-events: none;
+    z-index: 40;
+}
+
+.coin-hover-tooltip-date {
+    margin: 0 0 0.35rem;
+    color: #d8e1db;
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
+.coin-hover-tooltip-row {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    color: #aeb9b1;
+    font-size: 0.74rem;
+}
+
+.coin-hover-tooltip-row strong {
+    color: #edf5f0;
+    font-weight: 700;
 }
 
 .coin-chart-time-label {
