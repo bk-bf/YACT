@@ -2,6 +2,7 @@
   import M3Button from "../lib/components/M3Button.svelte";
 
   let { data } = $props();
+  let showAllHeadlines = $state(false);
 
   const usd = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -46,6 +47,10 @@
 
   function extraHeadlines() {
     return data.headlines.slice(3);
+  }
+
+  function visibleHeadlines() {
+    return showAllHeadlines ? data.headlines : featuredHeadlines();
   }
 
   const sparklineWidth = 140;
@@ -98,39 +103,16 @@
 </svelte:head>
 
 <section class="market-overview">
-  <div class="market-overview-head">
-    <div>
-      <h1>Cryptocurrency Prices by Market Cap</h1>
-      <p class="market-overview-subtitle">
-        The global crypto market cap today is
-        <strong>{compactUsd.format(data.global.totalMarketCapUsd)}</strong>, a
-        <span
-          class={data.global.marketCapChangePercentage24hUsd >= 0
-            ? "positive"
-            : "negative"}
-        >
-          {signedPercent.format(
-            data.global.marketCapChangePercentage24hUsd / 100,
-          )}
-        </span>
-        change in the last 24 hours.
-      </p>
-    </div>
-  </div>
-
   <section class="news-section" aria-label="Top crypto headlines">
     <div class="news-section-head">
       <h2>Top Crypto Headlines</h2>
-      <span
-        >{featuredHeadlines().length} of {data.headlines.length} stories</span
-      >
     </div>
 
     {#if data.headlines.length === 0}
       <p class="muted">No headlines available right now.</p>
     {:else}
       <ul class="news-list">
-        {#each featuredHeadlines() as headline}
+        {#each visibleHeadlines() as headline}
           <li>
             <a
               href={headline.url}
@@ -150,31 +132,37 @@
       </ul>
 
       {#if extraHeadlines().length > 0}
-        <details class="news-more">
-          <summary>View more</summary>
-          <ul class="news-list news-list-extra">
-            {#each extraHeadlines() as headline}
-              <li>
-                <a
-                  href={headline.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  class="news-link"
-                >
-                  {headline.title}
-                </a>
-                <span class="news-meta"
-                  >{headline.source} • {formatHeadlineDate(
-                    headline.publishedAt,
-                  )}</span
-                >
-              </li>
-            {/each}
-          </ul>
-        </details>
+        <button
+          type="button"
+          class="news-more-toggle"
+          onclick={() => (showAllHeadlines = !showAllHeadlines)}
+          aria-expanded={showAllHeadlines}
+        >
+          {showAllHeadlines ? "View less" : "View more"}
+        </button>
       {/if}
     {/if}
   </section>
+
+  <div class="market-overview-head">
+    <div>
+      <h1>Cryptocurrency Prices by Market Cap</h1>
+      <p class="market-overview-subtitle">
+        The global crypto market cap today is
+        <strong>{compactUsd.format(data.global.totalMarketCapUsd)}</strong>, a
+        <span
+          class={data.global.marketCapChangePercentage24hUsd >= 0
+            ? "positive"
+            : "negative"}
+        >
+          {signedPercent.format(
+            data.global.marketCapChangePercentage24hUsd / 100,
+          )}
+        </span>
+        change in the last 24 hours.
+      </p>
+    </div>
+  </div>
 
   <div class="overview-grid">
     <article class="overview-stat-card">
@@ -261,7 +249,14 @@
   {:else}
     <div class="table-filter-bar" role="toolbar" aria-label="Market filters">
       <div class="table-filter-left">
-        <button class="table-filter-item active" type="button">All</button>
+        <button class="table-filter-item active" type="button">Top 100</button>
+        <button class="table-filter-item" type="button">Trending</button>
+        <button class="table-filter-item" type="button">New Listings</button>
+        <button class="table-filter-item" type="button">Layer 1</button>
+        <button class="table-filter-item" type="button">DeFi</button>
+        <button class="table-filter-item" type="button">AI Tokens</button>
+        <span class="table-filter-divider" aria-hidden="true"></span>
+        <button class="table-filter-item" type="button">All</button>
         <button class="table-filter-item" type="button">Highlights</button>
         <button class="table-filter-item" type="button">Base Ecosystem</button>
         <button class="table-filter-item" type="button">Categories</button>
@@ -270,9 +265,6 @@
         >
         <button class="table-filter-item" type="button">Perpetuals</button>
         <button class="table-filter-item" type="button">DEX</button>
-      </div>
-      <div class="table-filter-right">
-        <button class="table-filter-action" type="button">Customize</button>
       </div>
     </div>
 

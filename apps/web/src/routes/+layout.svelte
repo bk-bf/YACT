@@ -9,15 +9,6 @@
         "Products",
         "Learn",
     ];
-
-    const marketTabs = [
-        "Top 100",
-        "Trending",
-        "New Listings",
-        "Layer 1",
-        "DeFi",
-        "AI Tokens",
-    ];
 </script>
 
 <div class="app-shell">
@@ -34,31 +25,7 @@
                 {/each}
             </nav>
 
-            <div class="menu-actions">
-                <button class="menu-action outlined" type="button"
-                    >Portfolio</button
-                >
-                <button class="menu-action outlined" type="button"
-                    >Alerts</button
-                >
-                <button class="menu-action filled" type="button">Sign In</button
-                >
-            </div>
-        </div>
-
-        <div class="top-nav-sub">
-            <div class="market-tabs">
-                {#each marketTabs as tabName}
-                    <button
-                        class={`market-tab ${tabName === "Top 100" ? "active" : ""}`}
-                        type="button"
-                    >
-                        {tabName}
-                    </button>
-                {/each}
-            </div>
-
-            <nav class="route-links">
+            <nav class="route-links" aria-label="Primary routes">
                 <a
                     class="route-link"
                     href="/"
@@ -74,6 +41,20 @@
                         : undefined}>Watchlist</a
                 >
             </nav>
+
+            <div class="menu-actions">
+                <button class="menu-action outlined" type="button"
+                    >Portfolio</button
+                >
+                <button class="menu-action outlined" type="button"
+                    >Alerts</button
+                >
+                <button class="menu-action outlined" type="button"
+                    >Customize</button
+                >
+                <button class="menu-action filled" type="button">Sign In</button
+                >
+            </div>
         </div>
     </header>
 
