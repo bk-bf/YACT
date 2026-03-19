@@ -1,0 +1,56 @@
+# Temporary ignores
+.github/
+docs/
+Agents.md
+.vscode/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Node / SvelteKit / Vercel
+node_modules/
+.svelte-kit/
+.vercel/
+dist/
+build/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging artifacts
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Caches, logs, and local runtime artifacts
+.cache/
+*.log
+dump.rdb
+
+# Supabase local artifacts
+supabase/.temp/

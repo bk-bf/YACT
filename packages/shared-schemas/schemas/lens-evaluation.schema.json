@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yact.local/schemas/lens-evaluation.schema.json",
+  "title": "LensEvaluation",
+  "type": "object",
+  "required": ["coin_id", "lens_id", "probability", "confidence", "sample_size"],
+  "properties": {
+    "coin_id"    : {"type": "string", "minLength": 1},
+    "lens_id"    : {"type": "string", "minLength": 1},
+    "probability": {"type": "number", "minimum": 0, "maximum": 1},
+    "confidence" : { "type": "string", "enum": ["low", "medium", "high"] },
+    "sample_size": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": false
+}

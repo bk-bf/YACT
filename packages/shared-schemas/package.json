@@ -1,0 +1,8 @@
+{
+  "name"   : "@yact/shared-schemas",
+  "version": "0.1.0",
+  "private": true,
+  "type"   : "module",
+  "files"  : ["schemas"],
+  "scripts": {"lint": "node ./scripts/validate-schemas.mjs", "test": "node ./scripts/validate-schemas.mjs"}
+}
