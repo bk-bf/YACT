@@ -765,7 +765,7 @@ a {
 
 .coin-terminal-layout {
     display: grid;
-    gap: var(--space-4);
+    gap: 0;
     grid-template-columns: 280px minmax(0, 1fr) 320px;
     align-items: start;
 }
@@ -776,11 +776,16 @@ a {
     gap: 0;
 }
 
+.coin-left-rail {
+    padding-right: var(--space-3);
+}
+
 .coin-main-panel {
     display: grid;
     gap: 0;
     border-left: 1px solid var(--color-divider);
-    padding-left: var(--space-4);
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
 }
 
 .coin-right-rail {
@@ -855,14 +860,18 @@ a {
 .coin-chart-card {
     display: grid;
     gap: var(--space-3);
+    margin-left: 0;
+    margin-right: calc(var(--space-3) * -1);
 }
 
 .coin-chart-shell {
-    border: 1px solid var(--color-divider);
+    border: 0;
     background:
-        radial-gradient(circle at 78% 16%, rgba(176, 38, 255, 0.06), transparent 44%),
-        linear-gradient(180deg, #05090f, #040811 52%, #03070f);
+        radial-gradient(circle at 84% 14%, rgba(255, 255, 255, 0.04), transparent 46%),
+        linear-gradient(180deg, #050505, #030303 52%, #010101);
     padding: var(--space-3);
+    padding-left: 0;
+    padding-right: 0;
 }
 
 .coin-chart-toolbar {
@@ -870,10 +879,14 @@ a {
     justify-content: space-between;
     align-items: center;
     gap: var(--space-3);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     border-bottom: 1px solid var(--color-row-divider);
     padding-bottom: var(--space-3);
+    padding-right: var(--space-2);
     margin-bottom: var(--space-3);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
 }
 
 .coin-chart-left,
@@ -881,7 +894,12 @@ a {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.coin-chart-right {
+    margin-right: var(--space-2);
 }
 
 .coin-chart-modes,
@@ -891,21 +909,21 @@ a {
     align-items: center;
     gap: 0.2rem;
     padding: 0.2rem;
-    border: 1px solid #263247;
+    border: 1px solid #2b2b2b;
     border-radius: 10px;
-    background: #0b1220;
+    background: #0a0a0a;
     overflow: hidden;
 }
 
 .coin-chart-range {
     flex-wrap: nowrap;
-    row-gap: 0.25rem;
+    row-gap: 0;
 }
 
 .coin-chip {
     border: 0;
     background: transparent;
-    color: #9caac1;
+    color: #a8a8a8;
     padding: 0.44rem 0.78rem;
     font-size: 0.8rem;
     font-weight: 700;
@@ -921,28 +939,17 @@ a {
 }
 
 .coin-chip.active {
-    color: #f1f5fb;
-    background: #19263a;
-}
-
-.coin-chart-provider {
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid #263247;
-    border-radius: 10px;
-    background: #0b1220;
-    color: #9fb0c7;
-    font-size: 0.82rem;
-    font-weight: 700;
-    padding: 0.42rem 0.72rem;
+    color: #f2f2f2;
+    background: #171717;
 }
 
 .coin-widget-wrap {
-    border: 1px solid #273347;
+    border: 0;
     min-height: 34rem;
     position: relative;
-    background: linear-gradient(180deg, #051025 0%, #040b1c 100%);
+    background: linear-gradient(180deg, #050505 0%, #020202 100%);
     overflow: hidden;
+    margin-left: 0;
 }
 
 .coin-custom-chart {
@@ -953,16 +960,16 @@ a {
 }
 
 .coin-chart-plot-bg {
-    fill: #041025;
+    fill: #070707;
 }
 
 .coin-chart-grid-line {
-    stroke: rgba(127, 146, 173, 0.28);
+    stroke: rgba(156, 156, 156, 0.24);
     stroke-width: 1;
 }
 
 .coin-chart-axis-label {
-    fill: #8fa0ba;
+    fill: #9f9f9f;
     font-size: 0.93rem;
     font-weight: 600;
 }
@@ -1007,7 +1014,7 @@ a {
 }
 
 .coin-current-line {
-    stroke: rgba(216, 225, 237, 0.55);
+    stroke: rgba(224, 224, 224, 0.45);
     stroke-dasharray: 1 6;
     stroke-width: 1;
 }
@@ -1031,27 +1038,27 @@ a {
 }
 
 .coin-volume-bg {
-    fill: #050c18;
+    fill: #080808;
 }
 
 .coin-volume-bar {
-    fill: rgba(68, 98, 164, 0.58);
+    fill: rgba(143, 143, 143, 0.55);
 }
 
 .coin-chart-time-label {
-    fill: #8fa0ba;
+    fill: #9f9f9f;
     font-size: 0.86rem;
     font-weight: 500;
 }
 
 .coin-overview-baseline {
-    stroke: rgba(127, 146, 173, 0.28);
+    stroke: rgba(156, 156, 156, 0.24);
     stroke-width: 1;
 }
 
 .coin-overview-line {
     fill: none;
-    stroke: #3a6ef5;
+    stroke: #58c07f;
     stroke-width: 1.5;
     opacity: 0.92;
 }
@@ -1257,7 +1264,7 @@ a {
     }
 
     .coin-chart-range {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
 
     .floating-headlines-panel {

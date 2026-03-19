@@ -152,6 +152,14 @@ interface CoinGeckoMarketChartResponse {
     total_volumes?: Array<[number, number]>;
 }
 
+export type CoinChartRange = '24h' | '7d' | '1m' | '3m' | 'ytd' | '1y' | 'max';
+
+export interface CoinChartSeries {
+    prices: number[];
+    volumes: number[];
+    source: 'coingecko' | 'coingecko-cache';
+}
+
 interface JsonRpcGasResponse {
     jsonrpc?: string;
     id?: number;
@@ -288,10 +296,22 @@ async function fetchCoinByIdWithRetry(fetchFn: typeof fetch, coinId: string): Pr
     });
 }
 
-async function fetchCoinChartWithRetry(fetchFn: typeof fetch, coinId: string): Promise<Response> {
-    const endpoint =
-        `${COINGECKO_COIN_ENDPOINT_BASE}/${encodeURIComponent(coinId)}/market_chart` +
-        '?vs_currency=usd&days=7&interval=hourly';
+async function fetchCoinChartWithRetry(
+    fetchFn: typeof fetch,
+    coinId: string,
+    days: string | number,
+    interval?: 'hourly' | 'daily'
+): Promise<Response> {
+    const query = new URLSearchParams({
+        vs_currency: 'usd',
+        days: String(days)
+    });
+
+    if (interval) {
+        query.set('interval', interval);
+    }
+
+    const endpoint = `${COINGECKO_COIN_ENDPOINT_BASE}/${encodeURIComponent(coinId)}/market_chart?${query.toString()}`;
 
     const first = await fetchFn(endpoint, {
         headers: {
@@ -311,6 +331,67 @@ async function fetchCoinChartWithRetry(fetchFn: typeof fetch, coinId: string): P
         }
     });
 }
+
+async function fetchCoinChartRangeWithRetry(
+    fetchFn: typeof fetch,
+    coinId: string,
+    fromUnixSec: number,
+    toUnixSec: number,
+    interval?: 'hourly' | 'daily'
+): Promise<Response> {
+    const query = new URLSearchParams({
+        vs_currency: 'usd',
+        from: String(fromUnixSec),
+        to: String(toUnixSec)
+    });
+
+    if (interval) {
+        query.set('interval', interval);
+    }
+
+    const endpoint = `${COINGECKO_COIN_ENDPOINT_BASE}/${encodeURIComponent(coinId)}/market_chart/range?${query.toString()}`;
+
+    const first = await fetchFn(endpoint, {
+        headers: {
+            accept: 'application/json'
+        }
+    });
+
+    if (first.status !== 429) {
+        return first;
+    }
+
+    await sleep(1200);
+
+    return fetchFn(endpoint, {
+        headers: {
+            accept: 'application/json'
+        }
+    });
+}
+
+function syntheticVolumesFromPrices(prices: number[], totalVolume24h: number): number[] {
+    const base = totalVolume24h / 24;
+    return prices.map((price, index, arr) => {
+        if (index === 0) {
+            return base;
+        }
+
+        const prev = arr[index - 1] || price;
+        const relativeMove = Math.abs((price - prev) / (prev || 1));
+        return base * (1 + relativeMove * 4);
+    });
+}
+
+const COIN_CHART_RANGE_CONFIG: Record<CoinChartRange, { durationHours?: number; days?: string | number; interval?: 'hourly' | 'daily' }> = {
+    '24h': { durationHours: 24, interval: 'hourly' },
+    '7d': { durationHours: 24 * 7, interval: 'hourly' },
+    '1m': { durationHours: 24 * 30, interval: 'hourly' },
+    '3m': { durationHours: 24 * 90, interval: 'hourly' },
+    ytd: { durationHours: 24 * 365, interval: 'daily' },
+    '1y': { durationHours: 24 * 365, interval: 'daily' },
+    max: { days: 'max', interval: 'daily' }
+};
 
 function firstNonEmpty(values: string[] | undefined): string | null {
     if (!values) {
@@ -568,7 +649,7 @@ export async function getCoinBreakdown(fetchFn: typeof fetch, coinId: string): P
     try {
         const [detailResponse, chartResponse] = await Promise.all([
             withTimeout(fetchCoinByIdWithRetry(fetchFn, coinId), 6_000),
-            withTimeout(fetchCoinChartWithRetry(fetchFn, coinId), 6_000)
+            withTimeout(fetchCoinChartWithRetry(fetchFn, coinId, 7, 'hourly'), 6_000)
         ]);
 
         if (!detailResponse.ok) {
@@ -642,5 +723,72 @@ export async function getCoinBreakdown(fetchFn: typeof fetch, coinId: string): P
         }
 
         throw new Error(`Coin breakdown unavailable for ${coinId}`);
+    }
+}
+
+export async function getCoinChartSeries(
+    fetchFn: typeof fetch,
+    coinId: string,
+    range: CoinChartRange
+): Promise<CoinChartSeries> {
+    const config = COIN_CHART_RANGE_CONFIG[range];
+    const cachedCoin = getCachedTopMarketCoins()?.coins.find((coin) => coin.id === coinId) ?? null;
+
+    try {
+        const nowUnixSec = Math.floor(Date.now() / 1000);
+
+        let response: Response;
+        if (config.days !== undefined) {
+            response = await withTimeout(
+                fetchCoinChartWithRetry(fetchFn, coinId, config.days, config.interval),
+                6_000
+            );
+        } else {
+            const ytdDurationHours = (() => {
+                const now = new Date();
+                const startOfYear = Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+                return Math.max(24, Math.floor((Date.now() - startOfYear) / (1000 * 60 * 60)));
+            })();
+            const durationHours = range === 'ytd' ? ytdDurationHours : (config.durationHours ?? 24 * 7);
+            const fromUnixSec = nowUnixSec - durationHours * 3600;
+            response = await withTimeout(
+                fetchCoinChartRangeWithRetry(fetchFn, coinId, fromUnixSec, nowUnixSec, config.interval),
+                6_000
+            );
+        }
+
+        if (!response.ok) {
+            throw new Error(`CoinGecko chart request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as CoinGeckoMarketChartResponse;
+        const prices = payload.prices?.map(([, price]) => price).filter((price) => Number.isFinite(price)) ?? [];
+        const volumes = payload.total_volumes
+            ?.map(([, volume]) => volume)
+            .filter((volume) => Number.isFinite(volume)) ?? [];
+
+        if (prices.length < 2) {
+            throw new Error('Chart series contains insufficient points.');
+        }
+
+        return {
+            prices,
+            volumes: volumes.length > 1 ? volumes : syntheticVolumesFromPrices(prices, cachedCoin?.totalVolume24h ?? 0),
+            source: 'coingecko'
+        };
+    } catch {
+        if (cachedCoin) {
+            const fallbackPrices = cachedCoin.sparkline7d.length > 1
+                ? cachedCoin.sparkline7d
+                : [cachedCoin.currentPrice, cachedCoin.currentPrice];
+
+            return {
+                prices: fallbackPrices,
+                volumes: syntheticVolumesFromPrices(fallbackPrices, cachedCoin.totalVolume24h),
+                source: 'coingecko-cache'
+            };
+        }
+
+        throw new Error(`Coin chart unavailable for ${coinId}`);
     }
 }
