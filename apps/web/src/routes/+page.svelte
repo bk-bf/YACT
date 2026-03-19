@@ -114,7 +114,8 @@
                 The global crypto market cap today is
                 <strong
                     >{formatDetailedUsd(data.global.totalMarketCapUsd)}</strong
-                >, a
+                >
+                a
                 <span
                     class={data.global.marketCapChangePercentage24hUsd >= 0
                         ? "positive"
