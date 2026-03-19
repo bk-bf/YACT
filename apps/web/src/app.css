@@ -233,6 +233,16 @@ a {
     font-weight: 700;
 }
 
+.warning-text {
+    color: #704a00;
+    background: #ffe5b2;
+    border: 1px solid #f2c978;
+    border-radius: var(--radius-sm);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-4);
+    font-weight: 600;
+}
+
 .grid-two {
     display: grid;
     gap: var(--space-4);

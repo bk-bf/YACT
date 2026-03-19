@@ -26,6 +26,10 @@
   subtitle={`Live source: ${data.source}`}
   elevated={true}
 >
+  {#if data.warning}
+    <p class="warning-text">{data.warning}</p>
+  {/if}
+
   {#if data.error}
     <p class="error-text">Unable to load market data: {data.error}</p>
   {:else}

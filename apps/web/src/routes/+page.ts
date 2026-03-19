@@ -6,6 +6,8 @@ interface MarketsResponse {
     source: string;
     count: number;
     coins: MarketCoin[];
+    stale?: boolean;
+    warning?: string;
     error?: string;
 }
 
@@ -16,6 +18,8 @@ export const load: PageLoad = async ({ fetch }) => {
     return {
         coins: payload.coins,
         source: payload.source,
+        stale: payload.stale ?? false,
+        warning: payload.warning ?? null,
         error: payload.error ?? null
     };
 };
