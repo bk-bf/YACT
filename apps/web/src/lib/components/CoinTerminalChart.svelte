@@ -63,6 +63,9 @@
 
     let chartMode = $state<ChartMode>("line");
     let chartRange = $state<ChartRange>("24h");
+    let chartRangeErrorByRange = $state<
+        Partial<Record<ChartRange, string | null>>
+    >({});
     let chartSeriesByRange = $state<
         Partial<
             Record<
@@ -111,6 +114,7 @@
         hour: "2-digit",
         minute: "2-digit",
     });
+    const CHART_CLIENT_DEBUG_PREFIX = "[chart-client-debug]";
 
     function buildLinePath(values: number[], min: number, max: number): string {
         if (values.length < 2) {
@@ -313,6 +317,24 @@
             return remote;
         }
 
+        // Only 7D has a meaningful server-provided seed in coin payload.
+        // For other ranges, avoid reusing 7D-like data because it is misleading.
+        if (chartRange !== "7d") {
+            const flatPrices = [coin.currentPrice, coin.currentPrice];
+            const flatVolumes = [
+                coin.totalVolume24h / 24,
+                coin.totalVolume24h / 24,
+            ];
+            return {
+                prices: flatPrices,
+                volumes: flatVolumes,
+                timestamps: buildSyntheticTimestamps(
+                    flatPrices.length,
+                    getRangeDurationHours(chartRange, flatPrices.length),
+                ),
+            };
+        }
+
         const fallbackPrices =
             coin.chartPrices7d?.length > 1
                 ? coin.chartPrices7d
@@ -499,6 +521,31 @@
 
         return hoverDateTime.format(new Date(hoverTimestamp));
     });
+    const activeRangeError = $derived(
+        chartRangeErrorByRange[chartRange] ?? null,
+    );
+
+    $effect(() => {
+        const range = chartRange;
+        const prices = filteredChartPrices;
+        const timestamps = filteredChartTimestamps;
+        const spanHours =
+            timestamps.length > 1
+                ? Math.floor(
+                      (timestamps[timestamps.length - 1] - timestamps[0]) /
+                          (1000 * 60 * 60),
+                  )
+                : 0;
+
+        console.info(CHART_CLIENT_DEBUG_PREFIX, {
+            phase: "render",
+            range,
+            points: prices.length,
+            spanHours,
+            firstTs: timestamps[0] ?? null,
+            lastTs: timestamps[timestamps.length - 1] ?? null,
+        });
+    });
 
     $effect(() => {
         if (!browser) {
@@ -519,16 +566,82 @@
         )
             .then(async (response) => {
                 if (!response.ok) {
-                    throw new Error(
-                        `Chart request failed with status ${response.status}`,
-                    );
+                    let errorText = `Chart request failed with status ${response.status}`;
+                    try {
+                        const payload = (await response.json()) as {
+                            error?: string;
+                            autoRefresh?: {
+                                schedulerStarted: boolean;
+                                running: boolean;
+                                lastCycleStartedAt: number | null;
+                                lastCycleFinishedAt: number | null;
+                                lastCycleOk: boolean | null;
+                                lastCycleError: string | null;
+                                lastAdHocCoin:
+                                    | {
+                                          coinId: string;
+                                          startedAt: number;
+                                          finishedAt: number | null;
+                                          ok: boolean | null;
+                                          error: string | null;
+                                      }
+                                    | null;
+                            };
+                        };
+                        if (payload.error) {
+                            errorText = payload.error;
+                        }
+                        if (payload.autoRefresh) {
+                            console.info(CHART_CLIENT_DEBUG_PREFIX, {
+                                phase: "auto-refresh-status",
+                                coinId: coin.id,
+                                range,
+                                status: payload.autoRefresh,
+                            });
+                        }
+                    } catch {
+                        // Keep default error text.
+                    }
+
+                    chartRangeErrorByRange = {
+                        ...chartRangeErrorByRange,
+                        [range]: errorText,
+                    };
+                    throw new Error(errorText);
                 }
 
                 const payload = (await response.json()) as {
                     prices?: number[];
                     volumes?: number[];
                     timestamps?: number[];
+                    warning?: string;
+                    autoRefresh?: {
+                        schedulerStarted: boolean;
+                        running: boolean;
+                        lastCycleStartedAt: number | null;
+                        lastCycleFinishedAt: number | null;
+                        lastCycleOk: boolean | null;
+                        lastCycleError: string | null;
+                        lastAdHocCoin:
+                            | {
+                                  coinId: string;
+                                  startedAt: number;
+                                  finishedAt: number | null;
+                                  ok: boolean | null;
+                                  error: string | null;
+                              }
+                            | null;
+                    };
                 };
+
+                if (payload.autoRefresh) {
+                    console.info(CHART_CLIENT_DEBUG_PREFIX, {
+                        phase: "auto-refresh-status",
+                        coinId: coin.id,
+                        range,
+                        status: payload.autoRefresh,
+                    });
+                }
 
                 const prices =
                     payload.prices?.filter((value) => Number.isFinite(value)) ??
@@ -571,10 +684,137 @@
                                   ),
                     },
                 };
+                chartRangeErrorByRange = {
+                    ...chartRangeErrorByRange,
+                    [range]: null,
+                };
+
+                if (payload.warning) {
+                    console.warn(CHART_CLIENT_DEBUG_PREFIX, {
+                        phase: "fetch-warning",
+                        coinId: coin.id,
+                        range,
+                        warning: payload.warning,
+                    });
+                }
+
+                const effectiveTs =
+                    timestamps.length === prices.length
+                        ? timestamps
+                        : buildSyntheticTimestamps(
+                              prices.length,
+                              getRangeDurationHours(range, prices.length),
+                          );
+                const spanHours =
+                    effectiveTs.length > 1
+                        ? Math.floor(
+                              (effectiveTs[effectiveTs.length - 1] -
+                                  effectiveTs[0]) /
+                                  (1000 * 60 * 60),
+                          )
+                        : 0;
+                console.info(CHART_CLIENT_DEBUG_PREFIX, {
+                    phase: "fetch",
+                    coinId: coin.id,
+                    range,
+                    status: response.status,
+                    points: prices.length,
+                    spanHours,
+                    firstTs: effectiveTs[0] ?? null,
+                    lastTs: effectiveTs[effectiveTs.length - 1] ?? null,
+                });
             })
-            .catch(() => {
-                // Keep existing fallback series when a range request fails.
+            .catch((error) => {
+                console.warn(CHART_CLIENT_DEBUG_PREFIX, {
+                    phase: "fetch-error",
+                    coinId: coin.id,
+                    range,
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                });
             });
+    });
+
+    $effect(() => {
+        if (!browser) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const poll = async () => {
+            try {
+                const response = await fetch(`/api/debug/auto-refresh?limit=6&_ts=${Date.now()}`, {
+                    cache: "no-store",
+                });
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = (await response.json()) as {
+                    status?: {
+                        intervalMs: number;
+                        schedulerStarted: boolean;
+                        running: boolean;
+                        nextCycleAt: number | null;
+                        cycleCount: number;
+                        lastCycleStartedAt: number | null;
+                        lastCycleFinishedAt: number | null;
+                        lastCycleOk: boolean | null;
+                        lastCycleError: string | null;
+                        lastSweepCoinCount: number;
+                    };
+                    events?: Array<{ ts: number; type: string }>;
+                };
+
+                if (cancelled || !payload.status) {
+                    return;
+                }
+
+                const latestEvent = payload.events?.[payload.events.length - 1] ?? null;
+                const failedByEvent = latestEvent?.type === "cycle-failed" || latestEvent?.type === "ad-hoc-coin-failed";
+                const successByEvent = latestEvent?.type === "cycle-success" || latestEvent?.type === "ad-hoc-coin-success";
+                const outcome = payload.status.running
+                    ? "running"
+                    : failedByEvent || payload.status.lastCycleOk === false
+                      ? "failure"
+                      : successByEvent || payload.status.lastCycleOk === true
+                        ? "success"
+                        : "unknown";
+                const nextCycleInSec = payload.status.nextCycleAt
+                    ? Math.max(0, Math.round((payload.status.nextCycleAt - Date.now()) / 1000))
+                    : null;
+                const logger = outcome === "failure" ? console.warn : console.info;
+
+                logger(CHART_CLIENT_DEBUG_PREFIX, {
+                    phase: "auto-refresh-poll",
+                    outcome,
+                    cycleCount: payload.status.cycleCount,
+                    nextCycleInSec,
+                    lastCycleOk: payload.status.lastCycleOk,
+                    lastCycleError: payload.status.lastCycleError,
+                    status: payload.status,
+                    latestEvent,
+                });
+            } catch (error) {
+                if (!cancelled) {
+                    console.warn(CHART_CLIENT_DEBUG_PREFIX, {
+                        phase: "auto-refresh-poll-error",
+                        error: error instanceof Error ? error.message : String(error),
+                    });
+                }
+            }
+        };
+
+        void poll();
+        const timer = window.setInterval(() => {
+            void poll();
+        }, 20_000);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+        };
     });
 </script>
 
@@ -622,6 +862,12 @@
         </div>
 
         <div class="coin-widget-wrap" aria-label={`${coin.name} custom chart`}>
+            {#if activeRangeError}
+                <p class="coin-chart-status">
+                    {chartRangeConfig[chartRange].label} data is not in DB yet. Auto-refresh
+                    is running in the background.
+                </p>
+            {/if}
             <svg
                 bind:this={chartSvg}
                 viewBox={`0 0 ${chartWidth} ${chartHeight}`}

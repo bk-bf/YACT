@@ -5,8 +5,10 @@ const COINGECKO_MARKETS_ENDPOINT =
     'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true&price_change_percentage=24h';
 const COINGECKO_GLOBAL_ENDPOINT = 'https://api.coingecko.com/api/v3/global';
 const COINGECKO_COIN_ENDPOINT_BASE = 'https://api.coingecko.com/api/v3/coins';
+const CRYPTOCOMPARE_API_BASE = 'https://min-api.cryptocompare.com/data/v2';
 
 const MARKET_CACHE_TTL_MS = 60_000;
+const CHART_DEBUG_PREFIX = '[chart-debug]';
 
 type MarketCache = {
     coins: MarketCoin[];
@@ -159,7 +161,20 @@ export interface CoinChartSeries {
     prices: number[];
     volumes: number[];
     timestamps: number[];
-    source: 'coingecko' | 'coingecko-cache';
+    source: 'coingecko' | 'coingecko-cache' | 'db-derived' | 'cryptocompare';
+}
+
+interface CryptoCompareCandle {
+    time: number;
+    close: number;
+    volumeto: number;
+}
+
+interface CryptoCompareResponse {
+    Response?: string;
+    Data?: {
+        Data?: CryptoCompareCandle[];
+    };
 }
 
 interface JsonRpcGasResponse {
@@ -375,6 +390,93 @@ async function fetchCoinChartRangeWithRetry(
 function toIsoMinuteString(date: Date): string {
     // CoinGecko docs recommend ISO date strings for best compatibility.
     return date.toISOString().slice(0, 16);
+}
+
+function getYtdStartUnixSec(nowUnixSec: number): number {
+    const now = new Date(nowUnixSec * 1000);
+    return Math.floor(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0) / 1000);
+}
+
+function cryptoCompareParamsForRange(
+    range: CoinChartRange,
+    nowUnixSec: number
+): { endpoint: 'histohour' | 'histoday'; limit?: number; allData?: boolean } {
+    switch (range) {
+        case '24h':
+            return { endpoint: 'histohour', limit: 24 };
+        case '7d':
+            return { endpoint: 'histohour', limit: 24 * 7 };
+        case '1m':
+            return { endpoint: 'histohour', limit: 24 * 30 };
+        case '3m':
+            return { endpoint: 'histoday', limit: 90 };
+        case 'ytd': {
+            const days = Math.max(1, Math.floor((nowUnixSec - getYtdStartUnixSec(nowUnixSec)) / (24 * 3600)));
+            return { endpoint: 'histoday', limit: days };
+        }
+        case '1y':
+            return { endpoint: 'histoday', limit: 365 };
+        case 'max':
+            return { endpoint: 'histoday', allData: true };
+        default:
+            return { endpoint: 'histoday', limit: 365 };
+    }
+}
+
+async function fetchCryptoCompareChartSeries(
+    symbol: string,
+    range: CoinChartRange,
+    nowUnixSec: number
+): Promise<CoinChartSeries | null> {
+    const fsym = symbol.trim().toUpperCase();
+    if (!fsym) {
+        return null;
+    }
+
+    const cfg = cryptoCompareParamsForRange(range, nowUnixSec);
+    const query = new URLSearchParams({
+        fsym,
+        tsym: 'USD'
+    });
+
+    if (cfg.allData) {
+        query.set('allData', 'true');
+    }
+    if (typeof cfg.limit === 'number') {
+        query.set('limit', String(cfg.limit));
+    }
+
+    const endpoint = `${CRYPTOCOMPARE_API_BASE}/${cfg.endpoint}?${query.toString()}`;
+    const response = await fetch(endpoint, {
+        headers: {
+            accept: 'application/json'
+        }
+    });
+
+    if (!response.ok) {
+        return null;
+    }
+
+    const payload = (await response.json()) as CryptoCompareResponse;
+    const rows = payload.Data?.Data?.filter((row) => Number.isFinite(row.time) && Number.isFinite(row.close)) ?? [];
+    if (!rows.length) {
+        return null;
+    }
+
+    const prices = rows.map((row) => row.close);
+    const volumes = rows.map((row) => (Number.isFinite(row.volumeto) ? row.volumeto : 0));
+    const timestamps = rows.map((row) => row.time * 1000);
+
+    if (prices.length < 2) {
+        return null;
+    }
+
+    return {
+        prices,
+        volumes,
+        timestamps,
+        source: 'cryptocompare'
+    };
 }
 
 function syntheticVolumesFromPrices(prices: number[], totalVolume24h: number): number[] {
@@ -784,6 +886,13 @@ export async function getCoinChartSeries(
 
         let response: Response;
         if (config.fromUnixSec !== undefined) {
+            console.info(`${CHART_DEBUG_PREFIX} request range endpoint`, {
+                coinId,
+                range,
+                from: toIsoMinuteString(new Date(config.fromUnixSec * 1000)),
+                to: nowIso,
+                interval: config.interval ?? 'auto'
+            });
             response = await withTimeout(
                 fetchCoinChartRangeWithRetry(
                     fetchFn,
@@ -795,6 +904,12 @@ export async function getCoinChartSeries(
                 6_000
             );
         } else if (config.days !== undefined) {
+            console.info(`${CHART_DEBUG_PREFIX} request days endpoint`, {
+                coinId,
+                range,
+                days: config.days,
+                interval: config.interval ?? 'auto'
+            });
             response = await withTimeout(
                 fetchCoinChartWithRetry(fetchFn, coinId, config.days, config.interval),
                 6_000
@@ -802,6 +917,14 @@ export async function getCoinChartSeries(
         } else {
             const durationHours = range === 'ytd' ? getYtdDurationHours() : (config.durationHours ?? 24 * 7);
             const fromUnixSec = nowUnixSec - durationHours * 3600;
+            console.info(`${CHART_DEBUG_PREFIX} request timed range endpoint`, {
+                coinId,
+                range,
+                from: toIsoMinuteString(new Date(fromUnixSec * 1000)),
+                to: nowIso,
+                durationHours,
+                interval: config.interval ?? 'auto'
+            });
             response = await withTimeout(
                 fetchCoinChartRangeWithRetry(
                     fetchFn,
@@ -833,6 +956,18 @@ export async function getCoinChartSeries(
             throw new Error('Chart series contains insufficient points.');
         }
 
+        const spanHours = timestamps.length > 1
+            ? Math.floor((timestamps[timestamps.length - 1] - timestamps[0]) / (1000 * 60 * 60))
+            : 0;
+        console.info(`${CHART_DEBUG_PREFIX} live series result`, {
+            coinId,
+            range,
+            source: 'coingecko',
+            prices: prices.length,
+            volumes: volumes.length,
+            spanHours
+        });
+
         return {
             prices,
             volumes: volumes.length > 1 ? volumes : syntheticVolumesFromPrices(prices, cachedCoin?.totalVolume24h ?? 0),
@@ -840,6 +975,24 @@ export async function getCoinChartSeries(
             source: 'coingecko'
         };
     } catch {
+        if (cachedCoin?.symbol) {
+            try {
+                const nowUnixSec = Math.floor(Date.now() / 1000);
+                const alt = await fetchCryptoCompareChartSeries(cachedCoin.symbol, range, nowUnixSec);
+                if (alt) {
+                    console.warn(`${CHART_DEBUG_PREFIX} alternate provider series result`, {
+                        coinId,
+                        range,
+                        source: alt.source,
+                        prices: alt.prices.length
+                    });
+                    return alt;
+                }
+            } catch {
+                // Continue to cache fallback.
+            }
+        }
+
         if (cachedCoin) {
             const fallbackPrices = cachedCoin.sparkline7d.length > 1
                 ? cachedCoin.sparkline7d
@@ -848,12 +1001,22 @@ export async function getCoinChartSeries(
                 ? getYtdDurationHours()
                 : (COIN_CHART_RANGE_CONFIG[range].durationHours ?? 24 * 365 * 2);
 
-            return {
+            const fallbackSeries = {
                 prices: fallbackPrices,
                 volumes: syntheticVolumesFromPrices(fallbackPrices, cachedCoin.totalVolume24h),
                 timestamps: buildSyntheticTimestamps(fallbackPrices.length, fallbackDurationHours),
                 source: 'coingecko-cache'
             };
+
+            console.warn(`${CHART_DEBUG_PREFIX} fallback series result`, {
+                coinId,
+                range,
+                source: fallbackSeries.source,
+                prices: fallbackSeries.prices.length,
+                spanHours: fallbackDurationHours
+            });
+
+            return fallbackSeries;
         }
 
         throw new Error(`Coin chart unavailable for ${coinId}`);

@@ -39,6 +39,42 @@ export interface PersistedCoinChartSeries {
     value: CoinChartSeries;
 }
 
+function pickNonEmptyString(primary: string, fallback: string): string {
+    return primary.trim().length > 0 ? primary : fallback;
+}
+
+function pickNonEmptyNullableString(primary: string | null, fallback: string | null): string | null {
+    if (primary && primary.trim().length > 0) {
+        return primary;
+    }
+
+    return fallback;
+}
+
+function mergeCoinBreakdownPreservingDetails(existing: CoinBreakdown | undefined, incoming: CoinBreakdown): CoinBreakdown {
+    if (!existing) {
+        return incoming;
+    }
+
+    const merged: CoinBreakdown = {
+        ...incoming,
+        maxSupply: incoming.maxSupply ?? existing.maxSupply,
+        allTimeHigh: incoming.allTimeHigh > 0 ? incoming.allTimeHigh : existing.allTimeHigh,
+        allTimeHighDate: pickNonEmptyNullableString(incoming.allTimeHighDate, existing.allTimeHighDate),
+        allTimeLow: incoming.allTimeLow > 0 ? incoming.allTimeLow : existing.allTimeLow,
+        allTimeLowDate: pickNonEmptyNullableString(incoming.allTimeLowDate, existing.allTimeLowDate),
+        categories: incoming.categories.length > 0 ? incoming.categories : existing.categories,
+        description: pickNonEmptyString(incoming.description, existing.description),
+        homepage: pickNonEmptyNullableString(incoming.homepage, existing.homepage),
+        blockchainSite: pickNonEmptyNullableString(incoming.blockchainSite, existing.blockchainSite),
+        sparkline7d: incoming.sparkline7d.length > 1 ? incoming.sparkline7d : existing.sparkline7d,
+        chartPrices7d: incoming.chartPrices7d.length > 1 ? incoming.chartPrices7d : existing.chartPrices7d,
+        chartVolumes7d: incoming.chartVolumes7d.length > 1 ? incoming.chartVolumes7d : existing.chartVolumes7d
+    };
+
+    return merged;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
 }
@@ -105,12 +141,13 @@ export async function readCoinBreakdownSnapshot(coinId: string): Promise<Persist
 export async function writeCoinBreakdownSnapshot(coinId: string, breakdown: CoinBreakdown): Promise<void> {
     const snapshot = await readSnapshot();
     const existing = snapshot.coins[coinId] ?? {};
+    const mergedBreakdown = mergeCoinBreakdownPreservingDetails(existing.breakdown?.value, breakdown);
 
     snapshot.coins[coinId] = {
         ...existing,
         breakdown: {
             ts: Date.now(),
-            value: breakdown
+            value: mergedBreakdown
         }
     };
     snapshot.updatedAt = Date.now();
