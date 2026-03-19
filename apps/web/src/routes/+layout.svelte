@@ -142,7 +142,7 @@
         <div class="top-nav-main">
             <div class="brand">
                 <span class="brand-badge">YACT</span>
-                <span class="brand-name">YACT Markets Terminal</span>
+                <span class="brand-name">YACT</span>
             </div>
 
             <nav class="menu-links" aria-label="Primary market menu">

@@ -3,6 +3,7 @@ import type { MarketCoin } from '../types/market';
 const COINGECKO_MARKETS_ENDPOINT =
     'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true&price_change_percentage=24h';
 const COINGECKO_GLOBAL_ENDPOINT = 'https://api.coingecko.com/api/v3/global';
+const COINGECKO_COIN_ENDPOINT_BASE = 'https://api.coingecko.com/api/v3/coins';
 
 const MARKET_CACHE_TTL_MS = 60_000;
 
@@ -21,6 +22,33 @@ export interface GlobalMarketSummary {
     activeCryptocurrencies: number;
     gasGwei: number | null;
     marketCapSparkline7d: number[];
+}
+
+export interface CoinBreakdown {
+    id: string;
+    symbol: string;
+    name: string;
+    image: string;
+    currentPrice: number;
+    marketCap: number;
+    marketCapRank: number;
+    totalVolume24h: number;
+    circulatingSupply: number;
+    maxSupply: number | null;
+    priceChangePercentage24h: number;
+    allTimeHigh: number;
+    allTimeHighDate: string | null;
+    allTimeLow: number;
+    allTimeLowDate: string | null;
+    categories: string[];
+    description: string;
+    homepage: string | null;
+    blockchainSite: string | null;
+    coingeckoUrl: string;
+    coinmarketcapUrl: string;
+    sparkline7d: number[];
+    chartPrices7d: number[];
+    source: 'coingecko' | 'coingecko-cache';
 }
 
 type GlobalCache = {
@@ -69,6 +97,57 @@ interface CoinGeckoGlobalResponse {
         markets: number;
         active_cryptocurrencies: number;
     };
+}
+
+interface CoinGeckoCoinDetailResponse {
+    id: string;
+    symbol: string;
+    name: string;
+    image?: {
+        large?: string;
+    };
+    market_cap_rank?: number;
+    categories?: string[];
+    description?: {
+        en?: string;
+    };
+    links?: {
+        homepage?: string[];
+        blockchain_site?: string[];
+    };
+    market_data?: {
+        current_price?: {
+            usd?: number;
+        };
+        market_cap?: {
+            usd?: number;
+        };
+        total_volume?: {
+            usd?: number;
+        };
+        circulating_supply?: number | null;
+        max_supply?: number | null;
+        price_change_percentage_24h?: number | null;
+        ath?: {
+            usd?: number;
+        };
+        ath_date?: {
+            usd?: string;
+        };
+        atl?: {
+            usd?: number;
+        };
+        atl_date?: {
+            usd?: string;
+        };
+        sparkline_7d?: {
+            price?: number[];
+        };
+    };
+}
+
+interface CoinGeckoMarketChartResponse {
+    prices?: Array<[number, number]>;
 }
 
 interface JsonRpcGasResponse {
@@ -181,6 +260,103 @@ async function fetchGlobalWithRetry(fetchFn: typeof fetch): Promise<Response> {
             accept: 'application/json'
         }
     });
+}
+
+async function fetchCoinByIdWithRetry(fetchFn: typeof fetch, coinId: string): Promise<Response> {
+    const endpoint =
+        `${COINGECKO_COIN_ENDPOINT_BASE}/${encodeURIComponent(coinId)}` +
+        '?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=true';
+
+    const first = await fetchFn(endpoint, {
+        headers: {
+            accept: 'application/json'
+        }
+    });
+
+    if (first.status !== 429) {
+        return first;
+    }
+
+    await sleep(1200);
+
+    return fetchFn(endpoint, {
+        headers: {
+            accept: 'application/json'
+        }
+    });
+}
+
+async function fetchCoinChartWithRetry(fetchFn: typeof fetch, coinId: string): Promise<Response> {
+    const endpoint =
+        `${COINGECKO_COIN_ENDPOINT_BASE}/${encodeURIComponent(coinId)}/market_chart` +
+        '?vs_currency=usd&days=7&interval=hourly';
+
+    const first = await fetchFn(endpoint, {
+        headers: {
+            accept: 'application/json'
+        }
+    });
+
+    if (first.status !== 429) {
+        return first;
+    }
+
+    await sleep(1200);
+
+    return fetchFn(endpoint, {
+        headers: {
+            accept: 'application/json'
+        }
+    });
+}
+
+function firstNonEmpty(values: string[] | undefined): string | null {
+    if (!values) {
+        return null;
+    }
+
+    const match = values.find((value) => typeof value === 'string' && value.trim().length > 0);
+    return match ?? null;
+}
+
+function toPlainText(html: string | undefined): string {
+    if (!html) {
+        return '';
+    }
+
+    return html
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function toCoinBreakdownFromCache(coin: MarketCoin): CoinBreakdown {
+    return {
+        id: coin.id,
+        symbol: coin.symbol,
+        name: coin.name,
+        image: coin.image,
+        currentPrice: coin.currentPrice,
+        marketCap: coin.marketCap,
+        marketCapRank: coin.marketCapRank,
+        totalVolume24h: coin.totalVolume24h,
+        circulatingSupply: coin.circulatingSupply,
+        maxSupply: null,
+        priceChangePercentage24h: coin.priceChangePercentage24h,
+        allTimeHigh: 0,
+        allTimeHighDate: null,
+        allTimeLow: 0,
+        allTimeLowDate: null,
+        categories: [],
+        description: '',
+        homepage: null,
+        blockchainSite: null,
+        coingeckoUrl: `https://www.coingecko.com/en/coins/${coin.id}`,
+        coinmarketcapUrl: `https://coinmarketcap.com/currencies/${coin.id}/`,
+        sparkline7d: coin.sparkline7d,
+        chartPrices7d: coin.sparkline7d,
+        source: 'coingecko-cache'
+    };
 }
 
 export function getCachedTopMarketCoins(): MarketCache | null {
@@ -371,4 +547,65 @@ export async function getTopMarketCoins(fetchFn: typeof fetch): Promise<MarketCo
     };
 
     return normalized;
+}
+
+export async function getCoinBreakdown(fetchFn: typeof fetch, coinId: string): Promise<CoinBreakdown> {
+    const cachedCoin = getCachedTopMarketCoins()?.coins.find((coin) => coin.id === coinId) ?? null;
+
+    try {
+        const [detailResponse, chartResponse] = await Promise.all([
+            withTimeout(fetchCoinByIdWithRetry(fetchFn, coinId), 6_000),
+            withTimeout(fetchCoinChartWithRetry(fetchFn, coinId), 6_000)
+        ]);
+
+        if (!detailResponse.ok) {
+            throw new Error(`CoinGecko coin request failed with status ${detailResponse.status}`);
+        }
+
+        const payload = (await detailResponse.json()) as CoinGeckoCoinDetailResponse;
+        const marketData = payload.market_data;
+        const sparkline = marketData?.sparkline_7d?.price ?? cachedCoin?.sparkline7d ?? [];
+        let chartPrices7d = sparkline;
+
+        if (chartResponse.ok) {
+            const chartPayload = (await chartResponse.json()) as CoinGeckoMarketChartResponse;
+            const prices = chartPayload.prices?.map(([, price]) => price).filter((price) => Number.isFinite(price));
+            if (prices && prices.length > 1) {
+                chartPrices7d = prices;
+            }
+        }
+
+        return {
+            id: payload.id,
+            symbol: payload.symbol,
+            name: payload.name,
+            image: payload.image?.large ?? cachedCoin?.image ?? '',
+            currentPrice: marketData?.current_price?.usd ?? cachedCoin?.currentPrice ?? 0,
+            marketCap: marketData?.market_cap?.usd ?? cachedCoin?.marketCap ?? 0,
+            marketCapRank: payload.market_cap_rank ?? cachedCoin?.marketCapRank ?? 0,
+            totalVolume24h: marketData?.total_volume?.usd ?? cachedCoin?.totalVolume24h ?? 0,
+            circulatingSupply: marketData?.circulating_supply ?? cachedCoin?.circulatingSupply ?? 0,
+            maxSupply: marketData?.max_supply ?? null,
+            priceChangePercentage24h: marketData?.price_change_percentage_24h ?? cachedCoin?.priceChangePercentage24h ?? 0,
+            allTimeHigh: marketData?.ath?.usd ?? 0,
+            allTimeHighDate: marketData?.ath_date?.usd ?? null,
+            allTimeLow: marketData?.atl?.usd ?? 0,
+            allTimeLowDate: marketData?.atl_date?.usd ?? null,
+            categories: payload.categories ?? [],
+            description: toPlainText(payload.description?.en),
+            homepage: firstNonEmpty(payload.links?.homepage),
+            blockchainSite: firstNonEmpty(payload.links?.blockchain_site),
+            coingeckoUrl: `https://www.coingecko.com/en/coins/${payload.id}`,
+            coinmarketcapUrl: `https://coinmarketcap.com/currencies/${payload.id}/`,
+            sparkline7d: sparkline.length > 1 ? sparkline : [marketData?.current_price?.usd ?? 0, marketData?.current_price?.usd ?? 0],
+            chartPrices7d: chartPrices7d.length > 1 ? chartPrices7d : [marketData?.current_price?.usd ?? 0, marketData?.current_price?.usd ?? 0],
+            source: 'coingecko'
+        };
+    } catch {
+        if (cachedCoin) {
+            return toCoinBreakdownFromCache(cachedCoin);
+        }
+
+        throw new Error(`Coin breakdown unavailable for ${coinId}`);
+    }
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { goto } from "$app/navigation";
     import M3Button from "../lib/components/M3Button.svelte";
 
     let { data } = $props();
@@ -99,6 +100,17 @@
 
     function formatDetailedUsd(value: number): string {
         return value >= 1000 ? largeUsd.format(value) : fullUsd.format(value);
+    }
+
+    function openCoinBreakdown(coinId: string): void {
+        void goto(`/currencies/${coinId}`);
+    }
+
+    function handleCoinRowKeydown(event: KeyboardEvent, coinId: string): void {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openCoinBreakdown(coinId);
+        }
     }
 </script>
 
@@ -309,7 +321,15 @@
                 </thead>
                 <tbody>
                     {#each data.coins as coin}
-                        <tr tabindex="0">
+                        <tr
+                            tabindex="0"
+                            class="coin-row-link"
+                            role="link"
+                            aria-label={`Open ${coin.name} breakdown`}
+                            onclick={() => openCoinBreakdown(coin.id)}
+                            onkeydown={(event) =>
+                                handleCoinRowKeydown(event, coin.id)}
+                        >
                             <td>{coin.marketCapRank}</td>
                             <td>
                                 <div class="coin-name">
