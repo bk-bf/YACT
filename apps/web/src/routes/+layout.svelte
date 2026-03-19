@@ -21,6 +21,7 @@
 
             <nav class="menu-links" aria-label="Primary market menu">
                 {#each primaryNav as navItem}
+                    <!-- TODO: Replace placeholder top-nav menu item with real route and data-backed destination. -->
                     <button class="menu-link" type="button">{navItem}</button>
                 {/each}
             </nav>
@@ -44,6 +45,7 @@
                 </nav>
 
                 <div class="menu-actions">
+                    <!-- TODO: Wire Sign In placeholder action to real authentication flow. -->
                     <button class="menu-action filled" type="button"
                         >Sign In</button
                     >

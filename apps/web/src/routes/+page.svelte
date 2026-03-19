@@ -132,6 +132,7 @@
       </ul>
 
       {#if extraHeadlines().length > 0}
+        <!-- TODO: Replace headlines view toggle placeholder with paginated or dedicated news route behavior. -->
         <button
           type="button"
           class="news-more-toggle"
@@ -202,6 +203,7 @@
     <article class="overview-list-card">
       <header>
         <h3>Trending</h3>
+        <!-- TODO: Wire this placeholder button to a full Trending list view. -->
         <button type="button" class="inline-link">View more</button>
       </header>
       <ul>
@@ -217,6 +219,7 @@
     <article class="overview-list-card">
       <header>
         <h3>Top Gainers</h3>
+        <!-- TODO: Wire this placeholder button to a full Top Gainers list view. -->
         <button type="button" class="inline-link">View more</button>
       </header>
       <ul>
@@ -246,22 +249,36 @@
   {#if data.error}
     <p class="error-text">Unable to load market data: {data.error}</p>
   {:else}
+    <!-- TODO: Connect placeholder market filter buttons to real filtering state/query logic. -->
     <div class="table-filter-bar" role="toolbar" aria-label="Market filters">
       <div class="table-filter-left">
+        <!-- TODO: Implement Top 100 filter behavior. -->
         <button class="table-filter-item active" type="button">Top 100</button>
+        <!-- TODO: Implement Trending filter behavior. -->
         <button class="table-filter-item" type="button">Trending</button>
+        <!-- TODO: Implement New Listings filter behavior. -->
         <button class="table-filter-item" type="button">New Listings</button>
+        <!-- TODO: Implement Layer 1 filter behavior. -->
         <button class="table-filter-item" type="button">Layer 1</button>
+        <!-- TODO: Implement DeFi filter behavior. -->
         <button class="table-filter-item" type="button">DeFi</button>
+        <!-- TODO: Implement AI Tokens filter behavior. -->
         <button class="table-filter-item" type="button">AI Tokens</button>
+        <!-- TODO: Implement All market category filter behavior. -->
         <button class="table-filter-item" type="button">All</button>
+        <!-- TODO: Implement Highlights category filter behavior. -->
         <button class="table-filter-item" type="button">Highlights</button>
+        <!-- TODO: Implement Base Ecosystem category filter behavior. -->
         <button class="table-filter-item" type="button">Base Ecosystem</button>
+        <!-- TODO: Implement Categories filter behavior. -->
         <button class="table-filter-item" type="button">Categories</button>
+        <!-- TODO: Implement Payment Solutions filter behavior. -->
         <button class="table-filter-item" type="button"
           >Payment Solutions</button
         >
+        <!-- TODO: Implement Perpetuals filter behavior. -->
         <button class="table-filter-item" type="button">Perpetuals</button>
+        <!-- TODO: Implement DEX filter behavior. -->
         <button class="table-filter-item" type="button">DEX</button>
       </div>
     </div>
@@ -328,7 +345,9 @@
   {/if}
 
   <div class="m3-button-row" style="margin-top: 1rem;">
+    <!-- TODO: Replace watchlist workspace shortcut placeholder with real watchlist workflow entry point. -->
     <M3Button href="/watchlist" tone="tonal">Open Watchlist Workspace</M3Button>
+    <!-- TODO: Replace refresh placeholder link with true refresh control/state action. -->
     <M3Button href="/" tone="outlined">Refresh Top 100</M3Button>
   </div>
 
