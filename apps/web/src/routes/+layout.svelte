@@ -9,9 +9,77 @@
         "Products",
         "Learn",
     ];
+
+    const compactUsd = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        notation: "compact",
+        maximumFractionDigits: 2,
+    });
+
+    const integerNumber = new Intl.NumberFormat("en-US");
+
+    const signedPercent = new Intl.NumberFormat("en-US", {
+        style: "percent",
+        maximumFractionDigits: 2,
+        signDisplay: "always",
+    });
+
+    function formatGasGwei(value: number | null | undefined): string {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return "--";
+        }
+
+        if (value < 1) {
+            return value.toFixed(3);
+        }
+
+        if (value < 10) {
+            return value.toFixed(2);
+        }
+
+        return value.toFixed(1);
+    }
 </script>
 
 <div class="app-shell">
+    {#if $page.url.pathname === "/" && $page.data?.global}
+        {@const global = $page.data.global}
+        <section class="market-floating-bar" aria-label="Pinned market stats">
+            <span class="market-floating-item"
+                >Coins: {integerNumber.format(
+                    global.activeCryptocurrencies,
+                )}</span
+            >
+            <span class="market-floating-item"
+                >Exchanges: {integerNumber.format(global.totalExchanges)}</span
+            >
+            <span class="market-floating-item"
+                >Market Cap: {compactUsd.format(global.totalMarketCapUsd)}
+                <span
+                    class={global.marketCapChangePercentage24hUsd >= 0
+                        ? "positive"
+                        : "negative"}
+                    >{signedPercent.format(
+                        global.marketCapChangePercentage24hUsd / 100,
+                    )}</span
+                ></span
+            >
+            <span class="market-floating-item"
+                >24h Vol: {compactUsd.format(global.totalVolumeUsd)}</span
+            >
+            <span class="market-floating-item"
+                >Dominance: BTC {global.btcDominance.toFixed(1)}%</span
+            >
+            <span class="market-floating-item"
+                >ETH {global.ethDominance.toFixed(1)}%</span
+            >
+            <span class="market-floating-item"
+                >Gas: {formatGasGwei(global.gasGwei)} GWEI</span
+            >
+        </section>
+    {/if}
+
     <header class="terminal-header">
         <div class="top-nav-main">
             <div class="brand">

@@ -315,6 +315,31 @@ a {
     padding: 0;
 }
 
+.market-floating-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.9rem;
+    overflow-x: auto;
+    margin-bottom: var(--space-4);
+    border-bottom: 1px solid #232a2f;
+    background: rgba(5, 6, 7, 0.92);
+    backdrop-filter: blur(4px);
+    padding: 0.46rem 0.2rem;
+}
+
+.market-floating-item {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    padding: 0 0.24rem;
+    color: #d6e3dc;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
 .market-overview-head {
     display: flex;
     justify-content: space-between;
@@ -469,6 +494,21 @@ a {
     align-items: center;
     gap: var(--space-2);
     font-size: 0.92rem;
+}
+
+.overview-coin-info {
+    display: grid;
+    gap: 0.08rem;
+}
+
+.overview-coin-meta {
+    color: var(--tv-text-muted);
+    font-size: 0.78rem;
+}
+
+.overview-coin-value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
 }
 
 .inline-link {
@@ -650,6 +690,11 @@ a {
 }
 
 @media (max-width: 760px) {
+
+    .market-floating-bar {
+        margin-left: -0.25rem;
+        margin-right: -0.25rem;
+    }
 
     .market-overview-head {
         flex-direction: column;

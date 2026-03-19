@@ -7,7 +7,10 @@ interface GlobalMarketSummary {
     totalVolumeUsd: number;
     marketCapChangePercentage24hUsd: number;
     btcDominance: number;
+    ethDominance: number;
+    totalExchanges: number;
     activeCryptocurrencies: number;
+    gasGwei: number | null;
     marketCapSparkline7d: number[];
 }
 

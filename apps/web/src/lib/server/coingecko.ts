@@ -79,7 +79,10 @@ export interface GlobalMarketSummary {
     totalVolumeUsd: number;
     marketCapChangePercentage24hUsd: number;
     btcDominance: number;
+    ethDominance: number;
+    totalExchanges: number;
     activeCryptocurrencies: number;
+    gasGwei: number | null;
     marketCapSparkline7d: number[];
 }
 
@@ -88,8 +91,14 @@ type GlobalCache = {
     fetchedAt: number;
 };
 
+type GasCache = {
+    gwei: number;
+    fetchedAt: number;
+};
+
 let marketCache: MarketCache | null = null;
 let globalCache: GlobalCache | null = null;
+let gasCache: GasCache | null = null;
 
 interface CoinGeckoMarketCoin {
     id: string;
@@ -118,10 +127,25 @@ interface CoinGeckoGlobalResponse {
         market_cap_change_percentage_24h_usd: number;
         market_cap_percentage: {
             btc: number;
+            eth: number;
         };
+        markets: number;
         active_cryptocurrencies: number;
     };
 }
+
+interface JsonRpcGasResponse {
+    jsonrpc?: string;
+    id?: number;
+    result?: string;
+}
+
+const ETH_RPC_GAS_ENDPOINTS = [
+    'https://eth.llamarpc.com',
+    'https://cloudflare-eth.com',
+    'https://ethereum-rpc.publicnode.com',
+    'https://rpc.ankr.com/eth'
+];
 
 function buildFallbackCoins(): MarketCoin[] {
     return Array.from({ length: 100 }, (_, i) => {
@@ -191,6 +215,22 @@ function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('request timeout')), timeoutMs);
+
+        promise
+            .then((value) => {
+                clearTimeout(timer);
+                resolve(value);
+            })
+            .catch((error) => {
+                clearTimeout(timer);
+                reject(error);
+            });
+    });
+}
+
 async function fetchMarketsWithRetry(fetchFn: typeof fetch): Promise<Response> {
     const first = await fetchFn(COINGECKO_MARKETS_ENDPOINT, {
         headers: {
@@ -257,6 +297,19 @@ export function getCachedGlobalMarketSummary(): GlobalCache | null {
     return globalCache;
 }
 
+export function getCachedGasGwei(): number | null {
+    if (!gasCache) {
+        return null;
+    }
+
+    const age = Date.now() - gasCache.fetchedAt;
+    if (age > MARKET_CACHE_TTL_MS) {
+        return null;
+    }
+
+    return gasCache.gwei;
+}
+
 export function getFallbackTopMarketCoins(): MarketCoin[] {
     return FALLBACK_COINS;
 }
@@ -265,15 +318,77 @@ export function getFallbackGlobalMarketSummary(coins: MarketCoin[]): GlobalMarke
     const totalMarketCapUsd = coins.reduce((sum, coin) => sum + coin.marketCap, 0);
     const totalVolumeUsd = coins.reduce((sum, coin) => sum + coin.totalVolume24h, 0);
     const btc = coins.find((coin) => coin.symbol.toLowerCase() === 'btc');
+    const eth = coins.find((coin) => coin.symbol.toLowerCase() === 'eth');
 
     return {
         totalMarketCapUsd,
         totalVolumeUsd,
         marketCapChangePercentage24hUsd: 0,
         btcDominance: totalMarketCapUsd > 0 && btc ? (btc.marketCap / totalMarketCapUsd) * 100 : 0,
+        ethDominance: totalMarketCapUsd > 0 && eth ? (eth.marketCap / totalMarketCapUsd) * 100 : 0,
+        totalExchanges: 0,
         activeCryptocurrencies: coins.length,
+        gasGwei: null,
         marketCapSparkline7d: buildMarketCapSparkline(coins)
     };
+}
+
+async function getGasGwei(): Promise<number | null> {
+    for (const endpoint of ETH_RPC_GAS_ENDPOINTS) {
+        try {
+            const response = await withTimeout(
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        accept: 'application/json',
+                        'content-type': 'application/json',
+                        'user-agent': 'yact/1.0 (gas-fetch)'
+                    },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'eth_gasPrice',
+                        params: [],
+                        id: 1
+                    })
+                }),
+                2_500
+            );
+
+            if (!response.ok) {
+                continue;
+            }
+
+            const payload = (await response.json()) as JsonRpcGasResponse;
+            const hexWei = payload.result;
+            if (typeof hexWei === 'string' && hexWei.startsWith('0x')) {
+                const wei = Number.parseInt(hexWei, 16);
+                if (Number.isFinite(wei)) {
+                    return wei / 1_000_000_000;
+                }
+            }
+        } catch {
+            // Continue to fallback endpoint or null result.
+        }
+    }
+
+    return null;
+}
+
+export async function getLatestGasGwei(): Promise<number | null> {
+    const cachedGas = getCachedGasGwei();
+    if (cachedGas !== null) {
+        return cachedGas;
+    }
+
+    const fresh = await getGasGwei();
+    if (fresh !== null) {
+        gasCache = {
+            gwei: fresh,
+            fetchedAt: Date.now()
+        };
+    }
+
+    return fresh;
 }
 
 export function getTopGainers(coins: MarketCoin[], count = 3): MarketCoin[] {
@@ -288,30 +403,49 @@ export function getTrendingByVolume(coins: MarketCoin[], count = 3): MarketCoin[
         .slice(0, count);
 }
 
-export async function getGlobalMarketSummary(fetchFn: typeof fetch): Promise<GlobalMarketSummary> {
-    const response = await fetchGlobalWithRetry(fetchFn);
+export async function getGlobalMarketSummary(fetchFn: typeof fetch, coinsForSparkline: MarketCoin[] = []): Promise<GlobalMarketSummary> {
+    const cached = getCachedGlobalMarketSummary();
 
-    if (!response.ok) {
-        throw new Error(`CoinGecko global request failed with status ${response.status}`);
+    try {
+        const response = await withTimeout(fetchGlobalWithRetry(fetchFn), 5_000);
+
+        if (!response.ok) {
+            throw new Error(`CoinGecko global request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as CoinGeckoGlobalResponse;
+        const gasGwei = await getLatestGasGwei();
+        const gasGweiResolved = gasGwei ?? cached?.summary.gasGwei ?? null;
+        const sourceCoins = coinsForSparkline.length ? coinsForSparkline : getCachedTopMarketCoins()?.coins ?? [];
+        const summary: GlobalMarketSummary = {
+            totalMarketCapUsd: payload.data.total_market_cap.usd,
+            totalVolumeUsd: payload.data.total_volume.usd,
+            marketCapChangePercentage24hUsd: payload.data.market_cap_change_percentage_24h_usd,
+            btcDominance: payload.data.market_cap_percentage.btc,
+            ethDominance: payload.data.market_cap_percentage.eth ?? 0,
+            totalExchanges: payload.data.markets ?? 0,
+            activeCryptocurrencies: payload.data.active_cryptocurrencies,
+            gasGwei: gasGweiResolved,
+            marketCapSparkline7d: buildMarketCapSparkline(sourceCoins)
+        };
+
+        globalCache = {
+            summary,
+            fetchedAt: Date.now()
+        };
+
+        return summary;
+    } catch (error) {
+        if (cached) {
+            return cached.summary;
+        }
+
+        if (coinsForSparkline.length) {
+            return getFallbackGlobalMarketSummary(coinsForSparkline);
+        }
+
+        throw error;
     }
-
-    const payload = (await response.json()) as CoinGeckoGlobalResponse;
-    const cachedCoins = getCachedTopMarketCoins();
-    const summary: GlobalMarketSummary = {
-        totalMarketCapUsd: payload.data.total_market_cap.usd,
-        totalVolumeUsd: payload.data.total_volume.usd,
-        marketCapChangePercentage24hUsd: payload.data.market_cap_change_percentage_24h_usd,
-        btcDominance: payload.data.market_cap_percentage.btc,
-        activeCryptocurrencies: payload.data.active_cryptocurrencies,
-        marketCapSparkline7d: buildMarketCapSparkline(cachedCoins?.coins ?? [])
-    };
-
-    globalCache = {
-        summary,
-        fetchedAt: Date.now()
-    };
-
-    return summary;
 }
 
 export async function getTopMarketCoins(fetchFn: typeof fetch): Promise<MarketCoin[]> {

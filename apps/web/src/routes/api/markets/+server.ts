@@ -2,10 +2,12 @@ import { json } from '@sveltejs/kit';
 
 import {
     getCachedGlobalMarketSummary,
+    getCachedGasGwei,
     getCachedTopMarketCoins,
     getFallbackGlobalMarketSummary,
     getFallbackTopMarketCoins,
     getGlobalMarketSummary,
+    getLatestGasGwei,
     getTopGainers,
     getTrendingByVolume,
     getTopMarketCoins
@@ -14,19 +16,24 @@ import { getFallbackCryptoHeadlines, getTopCryptoHeadlines } from '../../../lib/
 
 export async function GET({ fetch }) {
     const headlinesPromise = getTopCryptoHeadlines(fetch, 5).catch(() => getFallbackCryptoHeadlines());
+    const gasPromise = getLatestGasGwei().catch(() => getCachedGasGwei());
 
     try {
-        const [coins, global, headlines] = await Promise.all([
-            getTopMarketCoins(fetch),
-            getGlobalMarketSummary(fetch),
-            headlinesPromise
+        const coins = await getTopMarketCoins(fetch);
+        const [global, headlines, gasGwei] = await Promise.all([
+            getGlobalMarketSummary(fetch, coins),
+            headlinesPromise,
+            gasPromise
         ]);
 
         return json({
             source: 'coingecko',
             count: coins.length,
             coins,
-            global,
+            global: {
+                ...global,
+                gasGwei: gasGwei ?? global.gasGwei
+            },
             headlines,
             highlights: {
                 trending: getTrendingByVolume(coins, 3),
@@ -39,15 +46,19 @@ export async function GET({ fetch }) {
         const isRateLimit = message.includes('status 429') || message.includes('global request failed');
 
         if (isRateLimit) {
-            const headlines = await headlinesPromise;
+            const [headlines, gasGwei] = await Promise.all([headlinesPromise, gasPromise]);
             const cached = getCachedTopMarketCoins();
             const globalCached = getCachedGlobalMarketSummary();
             if (cached) {
+                const cachedGlobal = globalCached?.summary ?? getFallbackGlobalMarketSummary(cached.coins);
                 return json({
                     source: 'coingecko-cache',
                     count: cached.coins.length,
                     coins: cached.coins,
-                    global: globalCached?.summary ?? getFallbackGlobalMarketSummary(cached.coins),
+                    global: {
+                        ...cachedGlobal,
+                        gasGwei: gasGwei ?? cachedGlobal.gasGwei
+                    },
                     headlines,
                     highlights: {
                         trending: getTrendingByVolume(cached.coins, 3),
@@ -59,11 +70,15 @@ export async function GET({ fetch }) {
             }
 
             const fallback = getFallbackTopMarketCoins();
+            const fallbackGlobal = getFallbackGlobalMarketSummary(fallback);
             return json({
                 source: 'local-fallback',
                 count: fallback.length,
                 coins: fallback,
-                global: getFallbackGlobalMarketSummary(fallback),
+                global: {
+                    ...fallbackGlobal,
+                    gasGwei: gasGwei ?? fallbackGlobal.gasGwei
+                },
                 headlines,
                 highlights: {
                     trending: getTrendingByVolume(fallback, 3),
