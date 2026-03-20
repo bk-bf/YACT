@@ -1,5 +1,32 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
     import { page } from "$app/stores";
+
+    interface GlobalMarketSummary {
+        totalMarketCapUsd: number;
+        totalVolumeUsd: number;
+        marketCapChangePercentage24hUsd: number;
+        btcDominance: number;
+        ethDominance: number;
+        totalExchanges: number;
+        activeCryptocurrencies: number;
+        gasGwei: number | null;
+    }
+
+    interface CryptoHeadline {
+        id: string;
+        title: string;
+        url: string;
+        source: string;
+        publishedAt: string;
+    }
+
+    interface MarketsLayoutPayload {
+        global?: GlobalMarketSummary;
+        headlines?: CryptoHeadline[];
+    }
+
+    let { children } = $props();
 
     const primaryNav = [
         "Cryptocurrencies",
@@ -31,6 +58,9 @@
         minute: "2-digit",
     });
 
+    let sharedGlobal = $state<GlobalMarketSummary | null>(null);
+    let sharedHeadlines = $state<CryptoHeadline[]>([]);
+
     function formatHeadlineDate(value: string): string {
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) {
@@ -55,12 +85,69 @@
 
         return value.toFixed(1);
     }
+
+    $effect(() => {
+        const pageGlobal = $page.data?.global as GlobalMarketSummary | undefined;
+        if (pageGlobal) {
+            sharedGlobal = pageGlobal;
+        }
+
+        const pageHeadlines = $page.data?.headlines as
+            | CryptoHeadline[]
+            | undefined;
+        if (Array.isArray(pageHeadlines) && pageHeadlines.length > 0) {
+            sharedHeadlines = pageHeadlines;
+        }
+    });
+
+    $effect(() => {
+        if (!browser) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const syncFloatingData = async () => {
+            try {
+                const response = await fetch(`/api/markets?_ts=${Date.now()}`, {
+                    cache: "no-store",
+                });
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = (await response.json()) as MarketsLayoutPayload;
+                if (cancelled) {
+                    return;
+                }
+
+                if (payload.global) {
+                    sharedGlobal = payload.global;
+                }
+                if (Array.isArray(payload.headlines)) {
+                    sharedHeadlines = payload.headlines;
+                }
+            } catch {
+                // Ignore transient fetch errors; keep last known values.
+            }
+        };
+
+        void syncFloatingData();
+        const timer = window.setInterval(() => {
+            void syncFloatingData();
+        }, 30_000);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+        };
+    });
 </script>
 
 <div class="app-shell">
-    {#if $page.url.pathname === "/" && $page.data?.global}
-        {@const global = $page.data.global}
-        {@const topbarHeadlines = ($page.data?.headlines ?? []).slice(0, 5)}
+    {#if sharedGlobal ?? ($page.data?.global as GlobalMarketSummary | undefined)}
+        {@const global = sharedGlobal ?? ($page.data?.global as GlobalMarketSummary)}
+        {@const topbarHeadlines = (sharedHeadlines.length > 0 ? sharedHeadlines : ($page.data?.headlines ?? [])).slice(0, 5)}
         <section class="market-floating-bar" aria-label="Pinned market stats">
             <div class="market-floating-stats" aria-label="Live market stats">
                 <span class="market-floating-item"
@@ -179,5 +266,5 @@
         </div>
     </header>
 
-    <slot />
+    {@render children?.()}
 </div>
