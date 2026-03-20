@@ -564,10 +564,10 @@
 
         <aside class="coin-right-rail">
             <article class="coin-rail-card">
-                <h3>Community Sentiment</h3>
+                <h3>24h Price Momentum</h3>
                 <div
                     class="sentiment-bar"
-                    aria-label="Bullish vs bearish sentiment"
+                    aria-label="Bullish vs bearish momentum from 24h price change"
                 >
                     <span
                         class="sentiment-positive"
