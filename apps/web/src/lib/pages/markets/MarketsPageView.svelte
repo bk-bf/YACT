@@ -62,20 +62,24 @@
     }
 
     function sparklinePath(
-        points: number[],
+        points: number[] | null | undefined,
         width = sparklineWidth,
         height = sparklineHeight,
     ): string {
-        if (!points.length) return "";
-        if (points.length === 1)
+        const safePoints = Array.isArray(points)
+            ? points.filter((value) => Number.isFinite(value))
+            : [];
+
+        if (!safePoints.length) return "";
+        if (safePoints.length === 1)
             return `M 0 ${height / 2} L ${width} ${height / 2}`;
 
-        const min = Math.min(...points);
-        const max = Math.max(...points);
+        const min = Math.min(...safePoints);
+        const max = Math.max(...safePoints);
         const range = max - min || 1;
-        const stepX = width / (points.length - 1);
+        const stepX = width / (safePoints.length - 1);
 
-        return points
+        return safePoints
             .map((value, index) => {
                 const x = index * stepX;
                 const y = height - ((value - min) / range) * height;
@@ -85,10 +89,14 @@
     }
 
     function chartDirectionClass(
-        points: number[],
+        points: number[] | null | undefined,
     ): "chart-positive" | "chart-negative" {
-        if (points.length < 2) return "chart-negative";
-        return points[points.length - 1] >= points[0]
+        const safePoints = Array.isArray(points)
+            ? points.filter((value) => Number.isFinite(value))
+            : [];
+
+        if (safePoints.length < 2) return "chart-negative";
+        return safePoints[safePoints.length - 1] >= safePoints[0]
             ? "chart-positive"
             : "chart-negative";
     }
