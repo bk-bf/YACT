@@ -121,7 +121,12 @@
 
         try {
             const host = new URL(url).hostname.toLowerCase();
-            if (host === "x.com" || host.endsWith(".x.com") || host === "twitter.com" || host.endsWith(".twitter.com")) {
+            if (
+                host === "x.com" ||
+                host.endsWith(".x.com") ||
+                host === "twitter.com" ||
+                host.endsWith(".twitter.com")
+            ) {
                 return "https://x.com/favicon.ico";
             }
             if (host === "reddit.com" || host.endsWith(".reddit.com")) {
