@@ -4,6 +4,8 @@
     import { loadMarketsPageData } from "./markets-page.data";
 
     let { data } = $props();
+    let liveData = $state<typeof data | null>(null);
+    const viewData = $derived(liveData ?? data);
 
     const usd = new Intl.NumberFormat("en-US", {
         style: "currency",
@@ -56,7 +58,7 @@
     let initialDataLoaded = false;
 
     async function refreshMarketsData(): Promise<void> {
-        data = await loadMarketsPageData(fetch);
+        liveData = await loadMarketsPageData(fetch);
     }
 
     function sparklinePath(
@@ -92,7 +94,7 @@
     }
 
     function marketCapDirectionClass(): "chart-positive" | "chart-negative" {
-        return data.global.marketCapChangePercentage24hUsd >= 0
+        return viewData.global.marketCapChangePercentage24hUsd >= 0
             ? "chart-positive"
             : "chart-negative";
     }
@@ -141,7 +143,7 @@
         }
 
         let cancelled = false;
-        let lastSeenSnapshotTs = data.snapshotTs ?? null;
+        let lastSeenSnapshotTs = viewData.snapshotTs ?? null;
 
         const pollSnapshotMeta = async () => {
             try {
@@ -218,16 +220,17 @@
                 <span class="market-overview-pill">
                     <strong class="market-overview-pill-value"
                         >{formatDetailedUsd(
-                            data.global.totalMarketCapUsd,
+                            viewData.global.totalMarketCapUsd,
                         )}</strong
                     >
                     <span
-                        class={data.global.marketCapChangePercentage24hUsd >= 0
+                        class={viewData.global.marketCapChangePercentage24hUsd >= 0
                             ? "positive market-overview-pill-change"
                             : "negative market-overview-pill-change"}
                     >
                         {signedPercent.format(
-                            data.global.marketCapChangePercentage24hUsd / 100,
+                            viewData.global.marketCapChangePercentage24hUsd /
+                                100,
                         )}
                     </span>
                 </span>
@@ -238,22 +241,22 @@
 
     <div class="overview-grid">
         <article class="overview-stat-card">
-            <h3>{formatDetailedUsd(data.global.totalMarketCapUsd)}</h3>
+            <h3>{formatDetailedUsd(viewData.global.totalMarketCapUsd)}</h3>
             <p>
                 Market Cap
                 <span
-                    class={data.global.marketCapChangePercentage24hUsd >= 0
+                    class={viewData.global.marketCapChangePercentage24hUsd >= 0
                         ? "positive"
                         : "negative"}
                 >
                     {signedPercent.format(
-                        data.global.marketCapChangePercentage24hUsd / 100,
+                        viewData.global.marketCapChangePercentage24hUsd / 100,
                     )}
                 </span>
             </p>
             <p class="muted">
                 Reference compact value: {compactUsd.format(
-                    data.global.totalMarketCapUsd,
+                    viewData.global.totalMarketCapUsd,
                 )}
             </p>
             <svg
@@ -263,19 +266,19 @@
                 role="img"
                 aria-label="7 day market cap chart"
             >
-                <path d={sparklinePath(data.global.marketCapSparkline7d)} />
+                <path d={sparklinePath(viewData.global.marketCapSparkline7d)} />
             </svg>
         </article>
 
         <article class="overview-stat-card">
-            <h3>{formatDetailedUsd(data.global.totalVolumeUsd)}</h3>
+            <h3>{formatDetailedUsd(viewData.global.totalVolumeUsd)}</h3>
             <p>24h Trading Volume</p>
             <p class="muted">
-                BTC Dominance: {formatTwoDecimals(data.global.btcDominance)}%
+                BTC Dominance: {formatTwoDecimals(viewData.global.btcDominance)}%
             </p>
             <p class="muted">
                 Active Cryptocurrencies: {formatWhole(
-                    data.global.activeCryptocurrencies,
+                    viewData.global.activeCryptocurrencies,
                 )}
             </p>
         </article>
@@ -287,7 +290,7 @@
                 <button type="button" class="inline-link">View more</button>
             </header>
             <ul>
-                {#each data.highlights.trending as coin}
+                {#each viewData.highlights.trending as coin}
                     <li>
                         <div class="overview-coin-info">
                             <span>{displayCoinName(coin.name)}</span>
@@ -310,7 +313,7 @@
                 <button type="button" class="inline-link">View more</button>
             </header>
             <ul>
-                {#each data.highlights.topGainers as coin}
+                {#each viewData.highlights.topGainers as coin}
                     <li>
                         <div class="overview-coin-info">
                             <span>{displayCoinName(coin.name)}</span>
@@ -336,8 +339,8 @@
 
 <section class="market-section">
     <h2 class="m3-surface-title">Top 100 Cryptocurrencies By Market Cap</h2>
-    {#if data.error}
-        <p class="error-text">Unable to load market data: {data.error}</p>
+    {#if viewData.error}
+        <p class="error-text">Unable to load market data: {viewData.error}</p>
     {:else}
         <!-- TODO(T-007, see .docs/features/open/ROADMAP.md): Connect placeholder market filter buttons to real filtering state/query logic. -->
         <div
@@ -407,7 +410,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {#each data.coins as coin}
+                    {#each viewData.coins as coin}
                         <tr>
                             <td>{coin.marketCapRank}</td>
                             <td>
@@ -472,5 +475,5 @@
         <M3Button href="/" tone="outlined">Refresh Top 100</M3Button>
     </div>
 
-    <p class="market-footnote">Live source: {data.source}</p>
+    <p class="market-footnote">Live source: {viewData.source}</p>
 </section>

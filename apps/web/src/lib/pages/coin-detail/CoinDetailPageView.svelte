@@ -4,6 +4,8 @@
     import { loadCoinDetailPageData } from "./coin-detail-page.data";
 
     let { data } = $props();
+    let liveData = $state<typeof data | null>(null);
+    const viewData = $derived(liveData ?? data);
 
     const usd = new Intl.NumberFormat("en-US", {
         style: "currency",
@@ -47,11 +49,16 @@
         minute: "2-digit",
     });
 
-    const HEADLINES_REORDER_COOLDOWN_MS = 45_000;
-    let initialDataLoaded = false;
+    let lastLoadedCoinId = $state<string | null>(null);
+    let coinRefreshRequestId = 0;
 
-    async function refreshCoinData(): Promise<void> {
-        data = await loadCoinDetailPageData(fetch, coin.id);
+    async function refreshCoinData(coinId: string): Promise<void> {
+        const requestId = ++coinRefreshRequestId;
+        const nextData = await loadCoinDetailPageData(fetch, coinId);
+        if (requestId !== coinRefreshRequestId) {
+            return;
+        }
+        liveData = nextData;
     }
 
     function formatOptionalDate(value: string | null): string {
@@ -212,7 +219,7 @@
         return Math.min(Math.max(value, min), max);
     }
 
-    const coin = $derived(data.coin);
+    const coin = $derived(viewData.coin);
     let selectedCategory = $state("");
 
     $effect(() => {
@@ -228,7 +235,7 @@
     });
 
     const latestHeadlines = $derived(
-        [...(data.headlines ?? [])]
+        [...(viewData.headlines ?? [])]
             .sort((a, b) => {
                 const tsDelta =
                     +new Date(b.publishedAt) - +new Date(a.publishedAt);
@@ -240,82 +247,7 @@
             })
             .slice(0, 12),
     );
-    let visibleHeadlines = $state<typeof latestHeadlines>([]);
-    let pendingHeadlines = $state<typeof latestHeadlines>([]);
-    let headlinesCooldownUntil = $state<number | null>(null);
-    let headlinesNowTs = $state(Date.now());
-    const headlinesCooldownRemainingSec = $derived(
-        headlinesCooldownUntil
-            ? Math.max(
-                  0,
-                  Math.ceil((headlinesCooldownUntil - headlinesNowTs) / 1000),
-              )
-            : 0,
-    );
-
-    function headlineOrderKey(headlines: typeof latestHeadlines): string {
-        return headlines.map((headline) => headline.id).join("|");
-    }
-
-    $effect(() => {
-        if (!browser) {
-            visibleHeadlines = latestHeadlines;
-            return;
-        }
-
-        if (visibleHeadlines.length === 0) {
-            visibleHeadlines = latestHeadlines;
-            return;
-        }
-
-        if (
-            headlineOrderKey(latestHeadlines) ===
-            headlineOrderKey(visibleHeadlines)
-        ) {
-            return;
-        }
-
-        if (headlinesCooldownUntil && Date.now() < headlinesCooldownUntil) {
-            pendingHeadlines = latestHeadlines;
-            return;
-        }
-
-        visibleHeadlines = latestHeadlines;
-        pendingHeadlines = [];
-        headlinesCooldownUntil = Date.now() + HEADLINES_REORDER_COOLDOWN_MS;
-    });
-
-    $effect(() => {
-        if (!browser) {
-            return;
-        }
-
-        const timer = window.setInterval(() => {
-            headlinesNowTs = Date.now();
-            if (
-                headlinesCooldownUntil &&
-                headlinesNowTs >= headlinesCooldownUntil
-            ) {
-                if (
-                    pendingHeadlines.length > 0 &&
-                    headlineOrderKey(pendingHeadlines) !==
-                        headlineOrderKey(visibleHeadlines)
-                ) {
-                    visibleHeadlines = pendingHeadlines;
-                    pendingHeadlines = [];
-                    headlinesCooldownUntil =
-                        Date.now() + HEADLINES_REORDER_COOLDOWN_MS;
-                    return;
-                }
-
-                headlinesCooldownUntil = null;
-            }
-        }, 1000);
-
-        return () => {
-            window.clearInterval(timer);
-        };
-    });
+    const visibleHeadlines = $derived(latestHeadlines);
     const bullishShare = $derived(
         clamp(Math.round(50 + coin.priceChangePercentage24h * 4), 5, 95),
     );
@@ -563,12 +495,13 @@
             return;
         }
 
-        if (initialDataLoaded) {
+        if (lastLoadedCoinId === data.coin.id) {
             return;
         }
 
-        initialDataLoaded = true;
-        void refreshCoinData();
+        lastLoadedCoinId = data.coin.id;
+        liveData = null;
+        void refreshCoinData(data.coin.id);
     });
 
     $effect(() => {
@@ -577,13 +510,14 @@
         }
 
         let cancelled = false;
-        let lastCoinSnapshotTs = data.coinSnapshotTs ?? null;
-        let lastMarketSnapshotTs = data.marketsSnapshotTs ?? null;
+        let lastCoinSnapshotTs = viewData.coinSnapshotTs ?? null;
+        let lastMarketSnapshotTs = viewData.marketsSnapshotTs ?? null;
+        const currentCoinId = coin.id;
 
         const pollSnapshotMeta = async () => {
             try {
                 const response = await fetch(
-                    `/api/debug/snapshot-meta?coinId=${encodeURIComponent(coin.id)}&_ts=${Date.now()}`,
+                    `/api/debug/snapshot-meta?coinId=${encodeURIComponent(currentCoinId)}&_ts=${Date.now()}`,
                     { cache: "no-store" },
                 );
                 if (!response.ok) {
@@ -625,7 +559,7 @@
 
                     console.info("[auto-ui-refresh]", {
                         page: "coin",
-                        coinId: coin.id,
+                        coinId: currentCoinId,
                         previousCoinTs,
                         nextCoinTs: payload.coinSnapshotTs ?? null,
                         previousMarketTs,
@@ -634,13 +568,13 @@
                             ? "coin-db-updated"
                             : "market-db-updated",
                     });
-                    await refreshCoinData();
+                    await refreshCoinData(currentCoinId);
                 }
             } catch (error) {
                 if (!cancelled) {
                     console.warn("[auto-ui-refresh]", {
                         page: "coin",
-                        coinId: coin.id,
+                        coinId: currentCoinId,
                         phase: "poll-error",
                         error:
                             error instanceof Error
@@ -1133,18 +1067,6 @@
                 <p class="coin-news-subtitle">
                     Here is what happened in crypto today.
                 </p>
-                {#if headlinesCooldownUntil}
-                    <p
-                        class="coin-news-cooldown"
-                        role="status"
-                        aria-live="polite"
-                    >
-                        Reorder cooldown: {headlinesCooldownRemainingSec}s
-                        {#if pendingHeadlines.length > 0}
-                            <span> • update queued</span>
-                        {/if}
-                    </p>
-                {/if}
                 {#if visibleHeadlines.length > 0}
                     <ul class="coin-news-list">
                         {#each visibleHeadlines as headline}
@@ -1173,7 +1095,7 @@
             <article class="coin-rail-card">
                 <h3>Market Movers</h3>
                 <ul class="coin-movers-list">
-                    {#each data.topGainers.slice(0, 3) as mover}
+                    {#each viewData.topGainers.slice(0, 3) as mover}
                         <li>
                             <a href={`/currencies/${mover.id}`}>{mover.name}</a>
                             <span

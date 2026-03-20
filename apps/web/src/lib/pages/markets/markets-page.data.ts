@@ -65,14 +65,13 @@ function normalizeMarketsPayload(payload: Partial<MarketsResponse> | null) {
         source: safePayload.source ?? 'analytics-api',
         snapshotTs: safePayload.snapshotTs ?? safePayload.ts ?? null,
         stale: safePayload.stale ?? false,
-        error: safePayload.error ?? null
+        error: safePayload.error ?? undefined
     };
 }
 
 export function createInitialMarketsPageData() {
     return normalizeMarketsPayload({
-        stale: true,
-        error: null
+        stale: true
     });
 }
 
@@ -91,8 +90,7 @@ export async function loadMarketsPageData(fetchFn: typeof fetch) {
         return normalizeMarketsPayload(payload);
     } catch {
         return normalizeMarketsPayload({
-            stale: true,
-            error: null
+            stale: true
         });
     }
 }
