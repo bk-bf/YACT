@@ -114,7 +114,10 @@
             return;
         }
 
-        if (headlineOrderKey(latestHeadlines) === headlineOrderKey(visibleHeadlines)) {
+        if (
+            headlineOrderKey(latestHeadlines) ===
+            headlineOrderKey(visibleHeadlines)
+        ) {
             return;
         }
 
@@ -135,7 +138,10 @@
 
         const timer = window.setInterval(() => {
             headlinesNowTs = Date.now();
-            if (headlinesCooldownUntil && headlinesNowTs >= headlinesCooldownUntil) {
+            if (
+                headlinesCooldownUntil &&
+                headlinesNowTs >= headlinesCooldownUntil
+            ) {
                 if (
                     pendingHeadlines.length > 0 &&
                     headlineOrderKey(pendingHeadlines) !==
@@ -669,7 +675,11 @@
                     Here is what happened in crypto today.
                 </p>
                 {#if headlinesCooldownUntil}
-                    <p class="coin-news-cooldown" role="status" aria-live="polite">
+                    <p
+                        class="coin-news-cooldown"
+                        role="status"
+                        aria-live="polite"
+                    >
                         Reorder cooldown: {headlinesCooldownRemainingSec}s
                         {#if pendingHeadlines.length > 0}
                             <span> • update queued</span>

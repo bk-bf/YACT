@@ -13,6 +13,8 @@ const AUTO_REFRESH_INTERVAL_MS = 5 * 60_000;
 const QUEUE_POLL_INTERVAL_MS = 8_000;
 const MARKET_SWEEP_LIMIT = 100;
 const AUTO_REFRESH_LOG_PREFIX = '[auto-refresh]';
+const QUEUE_LOG_PREFIX = '[refresh-queue]';
+const QUEUE_DEBUG_LOGS_ENABLED = process.env.YACT_QUEUE_DEBUG === '1';
 const CHART_RANGES: CoinChartRange[] = ['24h', '7d', '1m', '3m', 'ytd', '1y', 'max'];
 
 let autoRefreshStarted = false;
@@ -131,6 +133,51 @@ function taskKey(type: RefreshTaskType, coinId: string | null): string {
     return type === 'markets' ? 'markets' : `coin:${coinId ?? 'unknown'}`;
 }
 
+function toQueueSnapshot(limit = 25): Array<{
+    key: string;
+    type: RefreshTaskType;
+    coinId: string | null;
+    priority: RefreshPriority;
+    priorityScore: number;
+    enqueuedAt: number;
+    reason: string;
+}> {
+    return [...refreshQueue.values()]
+        .sort((a, b) => {
+            if (a.priorityScore !== b.priorityScore) {
+                return b.priorityScore - a.priorityScore;
+            }
+            return a.enqueuedAt - b.enqueuedAt;
+        })
+        .slice(0, Math.max(1, limit))
+        .map((task) => ({
+            key: task.key,
+            type: task.type,
+            coinId: task.coinId,
+            priority: task.priority,
+            priorityScore: task.priorityScore,
+            enqueuedAt: task.enqueuedAt,
+            reason: task.reason
+        }));
+}
+
+function logQueueDebug(phase: string, detail: Record<string, unknown> = {}): void {
+    if (!QUEUE_DEBUG_LOGS_ENABLED) {
+        return;
+    }
+
+    console.info(`${QUEUE_LOG_PREFIX} ${phase}`, {
+        ...detail,
+        queueLength: refreshQueue.size,
+        queue: toQueueSnapshot(15)
+    });
+}
+
+export function getRefreshQueueSnapshot(limit = 25) {
+    const safeLimit = Math.max(1, Math.min(200, limit));
+    return toQueueSnapshot(safeLimit);
+}
+
 function popNextQueueTask(): RefreshTask | null {
     const tasks = [...refreshQueue.values()];
     if (!tasks.length) {
@@ -170,6 +217,14 @@ function popNextQueueTask(): RefreshTask | null {
         }
         : null;
 
+    logQueueDebug('dequeue', {
+        key: selected.key,
+        type: selected.type,
+        coinId: selected.coinId,
+        priority: selected.priority,
+        reason: selected.reason
+    });
+
     return selected;
 }
 
@@ -190,9 +245,29 @@ function enqueueTask(type: RefreshTaskType, coinId: string | null, priority: Ref
     if (existing) {
         if (candidate.priorityScore >= existing.priorityScore) {
             refreshQueue.set(key, candidate);
+            logQueueDebug('enqueue-update', {
+                key,
+                oldPriority: existing.priority,
+                newPriority: candidate.priority,
+                reason
+            });
+        } else {
+            logQueueDebug('enqueue-skip-lower-priority', {
+                key,
+                existingPriority: existing.priority,
+                attemptedPriority: candidate.priority,
+                reason
+            });
         }
     } else {
         refreshQueue.set(key, candidate);
+        logQueueDebug('enqueue-new', {
+            key,
+            type,
+            coinId,
+            priority,
+            reason
+        });
     }
 
     autoRefreshStatus.queueLength = refreshQueue.size;
@@ -220,18 +295,43 @@ async function runQueueTask(task: RefreshTask): Promise<void> {
     const now = Date.now();
 
     if (now - lastRun < cooldownMs) {
+        logQueueDebug('cooldown-skip', {
+            key: task.key,
+            type: task.type,
+            coinId: task.coinId,
+            cooldownMs,
+            ageMs: now - lastRun,
+            reason: task.reason
+        });
         return;
     }
 
     taskLastRunAt.set(task.key, now);
+    logQueueDebug('execute-start', {
+        key: task.key,
+        type: task.type,
+        coinId: task.coinId,
+        priority: task.priority,
+        reason: task.reason
+    });
 
     if (task.type === 'markets') {
         await refreshMarketsNow(fetch);
+        logQueueDebug('execute-success', {
+            key: task.key,
+            type: task.type,
+            coinId: task.coinId
+        });
         return;
     }
 
     if (task.coinId) {
         await refreshCoinNow(fetch, task.coinId);
+        logQueueDebug('execute-success', {
+            key: task.key,
+            type: task.type,
+            coinId: task.coinId
+        });
     }
 }
 
@@ -249,6 +349,13 @@ async function processRefreshQueue(): Promise<void> {
     try {
         await runQueueTask(task);
     } catch (error) {
+        logQueueDebug('execute-failed', {
+            key: task.key,
+            type: task.type,
+            coinId: task.coinId,
+            reason: task.reason,
+            error: error instanceof Error ? error.message : String(error)
+        });
         console.warn(`${AUTO_REFRESH_LOG_PREFIX} queued task failed`, {
             key: task.key,
             type: task.type,
