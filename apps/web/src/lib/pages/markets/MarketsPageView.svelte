@@ -224,7 +224,8 @@
                         )}</strong
                     >
                     <span
-                        class={viewData.global.marketCapChangePercentage24hUsd >= 0
+                        class={viewData.global
+                            .marketCapChangePercentage24hUsd >= 0
                             ? "positive market-overview-pill-change"
                             : "negative market-overview-pill-change"}
                     >
@@ -274,7 +275,9 @@
             <h3>{formatDetailedUsd(viewData.global.totalVolumeUsd)}</h3>
             <p>24h Trading Volume</p>
             <p class="muted">
-                BTC Dominance: {formatTwoDecimals(viewData.global.btcDominance)}%
+                BTC Dominance: {formatTwoDecimals(
+                    viewData.global.btcDominance,
+                )}%
             </p>
             <p class="muted">
                 Active Cryptocurrencies: {formatWhole(
