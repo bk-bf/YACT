@@ -10,6 +10,8 @@ const SNAPSHOT_FILE = path.join(SNAPSHOT_DIR, 'coin-snapshot.json');
 const SNAPSHOT_BACKUP_FILE = path.join(SNAPSHOT_DIR, 'coin-snapshot.backup.json');
 const SNAPSHOT_LOG_PREFIX = '[coin-snapshot]';
 
+let snapshotWriteLock: Promise<void> = Promise.resolve();
+
 interface StoredCoinBreakdown {
     ts: number;
     value: CoinBreakdown;
@@ -29,6 +31,34 @@ interface PersistentCoinSnapshot {
     v: number;
     updatedAt: number;
     coins: Record<string, StoredCoinEntry>;
+}
+
+function normalizeCoinBreakdown(value: CoinBreakdown): CoinBreakdown {
+    const websites = Array.isArray((value as Partial<CoinBreakdown>).websites)
+        ? (value as Partial<CoinBreakdown>).websites ?? []
+        : [];
+    const explorers = Array.isArray((value as Partial<CoinBreakdown>).explorers)
+        ? (value as Partial<CoinBreakdown>).explorers ?? []
+        : [];
+    const community = Array.isArray((value as Partial<CoinBreakdown>).community)
+        ? (value as Partial<CoinBreakdown>).community ?? []
+        : [];
+    const contracts = Array.isArray((value as Partial<CoinBreakdown>).contracts)
+        ? (value as Partial<CoinBreakdown>).contracts ?? []
+        : [];
+    const chains = Array.isArray((value as Partial<CoinBreakdown>).chains)
+        ? (value as Partial<CoinBreakdown>).chains ?? []
+        : [];
+
+    return {
+        ...value,
+        apiId: value.apiId || value.id,
+        websites,
+        explorers,
+        community,
+        contracts,
+        chains
+    };
 }
 
 export interface PersistedCoinBreakdown {
@@ -77,8 +107,15 @@ function mergeCoinBreakdownPreservingDetails(
         ? existing.description
         : pickNonEmptyString(incoming.description, existing.description);
 
+    const existingWebsites = existing.websites ?? [];
+    const existingExplorers = existing.explorers ?? [];
+    const existingCommunity = existing.community ?? [];
+    const existingContracts = existing.contracts ?? [];
+    const existingChains = existing.chains ?? [];
+
     const merged: CoinBreakdown = {
         ...incoming,
+        apiId: pickNonEmptyString(incoming.apiId, existing.apiId ?? existing.id),
         maxSupply: incoming.maxSupply ?? existing.maxSupply,
         allTimeHigh: incoming.allTimeHigh > 0 ? incoming.allTimeHigh : existing.allTimeHigh,
         allTimeHighDate: pickNonEmptyNullableString(incoming.allTimeHighDate, existing.allTimeHighDate),
@@ -87,6 +124,11 @@ function mergeCoinBreakdownPreservingDetails(
         low24h: incoming.low24h ?? existing.low24h,
         high24h: incoming.high24h ?? existing.high24h,
         categories: incoming.categories.length > 0 ? incoming.categories : existing.categories,
+        websites: incoming.websites.length > 0 ? incoming.websites : existingWebsites,
+        explorers: incoming.explorers.length > 0 ? incoming.explorers : existingExplorers,
+        community: incoming.community.length > 0 ? incoming.community : existingCommunity,
+        contracts: incoming.contracts.length > 0 ? incoming.contracts : existingContracts,
+        chains: incoming.chains.length > 0 ? incoming.chains : existingChains,
         description,
         homepage: pickNonEmptyNullableString(incoming.homepage, existing.homepage),
         blockchainSite: pickNonEmptyNullableString(incoming.blockchainSite, existing.blockchainSite),
@@ -171,11 +213,62 @@ function normalizeSnapshotLike(value: unknown): PersistentCoinSnapshot | null {
     return normalized;
 }
 
-async function tryReadSnapshotFile(filePath: string): Promise<PersistentCoinSnapshot | null> {
-    try {
-        const raw = await readFile(filePath, 'utf-8');
-        const parsed = JSON.parse(raw);
+function extractFirstJsonObject(raw: string): string | null {
+    let start = -1;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
 
+    for (let index = 0; index < raw.length; index += 1) {
+        const char = raw[index];
+
+        if (start === -1) {
+            if (char === '{') {
+                start = index;
+                depth = 1;
+            }
+            continue;
+        }
+
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (char === '\\') {
+                escaped = true;
+                continue;
+            }
+            if (char === '"') {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === '"') {
+            inString = true;
+            continue;
+        }
+
+        if (char === '{') {
+            depth += 1;
+            continue;
+        }
+
+        if (char === '}') {
+            depth -= 1;
+            if (depth === 0) {
+                return raw.slice(start, index + 1);
+            }
+        }
+    }
+
+    return null;
+}
+
+function tryParseSnapshotPayload(raw: string, filePath: string): PersistentCoinSnapshot | null {
+    try {
+        const parsed = JSON.parse(raw);
         if (isValidSnapshot(parsed)) {
             return parsed;
         }
@@ -187,6 +280,54 @@ async function tryReadSnapshotFile(filePath: string): Promise<PersistentCoinSnap
         }
 
         return null;
+    } catch {
+        const recoveredRaw = extractFirstJsonObject(raw);
+        if (!recoveredRaw || recoveredRaw.length === raw.length) {
+            return null;
+        }
+
+        try {
+            const recovered = JSON.parse(recoveredRaw);
+            if (isValidSnapshot(recovered)) {
+                console.warn(`${SNAPSHOT_LOG_PREFIX} recovered valid JSON prefix from ${filePath}`);
+                return recovered;
+            }
+
+            const migratedRecovered = normalizeSnapshotLike(recovered);
+            if (migratedRecovered) {
+                console.warn(`${SNAPSHOT_LOG_PREFIX} recovered and migrated JSON prefix from ${filePath}`);
+                return migratedRecovered;
+            }
+        } catch {
+            // Ignore and return null below.
+        }
+
+        return null;
+    }
+}
+
+async function withSnapshotWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = snapshotWriteLock;
+    let release: () => void = () => undefined;
+    snapshotWriteLock = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+
+    await previous.catch(() => {
+        // Keep lock chain progressing even if a previous writer failed.
+    });
+
+    try {
+        return await operation();
+    } finally {
+        release();
+    }
+}
+
+async function tryReadSnapshotFile(filePath: string): Promise<PersistentCoinSnapshot | null> {
+    try {
+        const raw = await readFile(filePath, 'utf-8');
+        return tryParseSnapshotPayload(raw, filePath);
     } catch (error) {
         if (isObject(error) && error.code === 'ENOENT') {
             return null;
@@ -219,10 +360,14 @@ async function readSnapshot(): Promise<PersistentCoinSnapshot> {
 async function writeSnapshot(snapshot: PersistentCoinSnapshot): Promise<void> {
     await mkdir(SNAPSHOT_DIR, { recursive: true });
     const serialized = JSON.stringify(snapshot);
-    const tempFile = `${SNAPSHOT_FILE}.tmp`;
-    await writeFile(tempFile, serialized, 'utf-8');
-    await rename(tempFile, SNAPSHOT_FILE);
-    await writeFile(SNAPSHOT_BACKUP_FILE, serialized, 'utf-8');
+    const nonce = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const primaryTempFile = `${SNAPSHOT_FILE}.${nonce}.tmp`;
+    const backupTempFile = `${SNAPSHOT_BACKUP_FILE}.${nonce}.tmp`;
+
+    await writeFile(primaryTempFile, serialized, 'utf-8');
+    await rename(primaryTempFile, SNAPSHOT_FILE);
+    await writeFile(backupTempFile, serialized, 'utf-8');
+    await rename(backupTempFile, SNAPSHOT_BACKUP_FILE);
 }
 
 export async function readCoinBreakdownSnapshot(coinId: string): Promise<PersistedCoinBreakdown | null> {
@@ -232,29 +377,34 @@ export async function readCoinBreakdownSnapshot(coinId: string): Promise<Persist
         return null;
     }
 
-    return entry.breakdown;
+    return {
+        ...entry.breakdown,
+        value: normalizeCoinBreakdown(entry.breakdown.value)
+    };
 }
 
 export async function writeCoinBreakdownSnapshot(coinId: string, breakdown: CoinBreakdown): Promise<void> {
-    const snapshot = await readSnapshot();
-    const existing = snapshot.coins[coinId] ?? {};
-    const mergedBreakdown = mergeCoinBreakdownPreservingDetails(
-        existing.breakdown?.value,
-        existing.breakdown?.ts,
-        breakdown
-    );
-
-    snapshot.coins[coinId] = {
-        ...existing,
-        breakdown: {
-            ts: Date.now(),
-            value: mergedBreakdown
-        }
-    };
-    snapshot.updatedAt = Date.now();
-
     try {
-        await writeSnapshot(snapshot);
+        await withSnapshotWriteLock(async () => {
+            const snapshot = await readSnapshot();
+            const existing = snapshot.coins[coinId] ?? {};
+            const mergedBreakdown = mergeCoinBreakdownPreservingDetails(
+                existing.breakdown?.value ? normalizeCoinBreakdown(existing.breakdown.value) : undefined,
+                existing.breakdown?.ts,
+                normalizeCoinBreakdown(breakdown)
+            );
+
+            snapshot.coins[coinId] = {
+                ...existing,
+                breakdown: {
+                    ts: Date.now(),
+                    value: mergedBreakdown
+                }
+            };
+            snapshot.updatedAt = Date.now();
+
+            await writeSnapshot(snapshot);
+        });
     } catch (error) {
         console.error(`${SNAPSHOT_LOG_PREFIX} failed to write breakdown for ${coinId}:`, error);
         throw error;
@@ -277,23 +427,25 @@ export async function writeCoinChartSnapshot(
     range: CoinChartRange,
     series: CoinChartSeries
 ): Promise<void> {
-    const snapshot = await readSnapshot();
-    const existing = snapshot.coins[coinId] ?? {};
-
-    snapshot.coins[coinId] = {
-        ...existing,
-        charts: {
-            ...(existing.charts ?? {}),
-            [range]: {
-                ts: Date.now(),
-                value: series
-            }
-        }
-    };
-    snapshot.updatedAt = Date.now();
-
     try {
-        await writeSnapshot(snapshot);
+        await withSnapshotWriteLock(async () => {
+            const snapshot = await readSnapshot();
+            const existing = snapshot.coins[coinId] ?? {};
+
+            snapshot.coins[coinId] = {
+                ...existing,
+                charts: {
+                    ...(existing.charts ?? {}),
+                    [range]: {
+                        ts: Date.now(),
+                        value: series
+                    }
+                }
+            };
+            snapshot.updatedAt = Date.now();
+
+            await writeSnapshot(snapshot);
+        });
     } catch (error) {
         console.error(`${SNAPSHOT_LOG_PREFIX} failed to write chart for ${coinId}/${range}:`, error);
         throw error;

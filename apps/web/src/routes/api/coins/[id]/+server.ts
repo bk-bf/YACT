@@ -65,6 +65,7 @@ function buildDerivedBreakdownFromMarketCoin(coin: MarketCoin) {
 
     return {
         id: coin.id,
+        apiId: coin.id,
         symbol: coin.symbol,
         name: coin.name,
         image: coin.image,
@@ -85,6 +86,11 @@ function buildDerivedBreakdownFromMarketCoin(coin: MarketCoin) {
         description: '',
         homepage: null,
         blockchainSite: null,
+        websites: [],
+        explorers: [],
+        community: [],
+        contracts: [],
+        chains: [],
         coingeckoUrl: `https://www.coingecko.com/en/coins/${coin.id}`,
         coinmarketcapUrl: `https://coinmarketcap.com/currencies/${coin.id}/`,
         sparkline7d: coin.sparkline7d,

@@ -36,6 +36,7 @@ export interface CoinBreakdown {
     currentPrice: number;
     marketCap: number;
     marketCapRank: number;
+    apiId: string;
     totalVolume24h: number;
     low24h: number | null;
     high24h: number | null;
@@ -50,6 +51,11 @@ export interface CoinBreakdown {
     description: string;
     homepage: string | null;
     blockchainSite: string | null;
+    websites: string[];
+    explorers: string[];
+    community: Array<{ label: string; url: string }>;
+    contracts: Array<{ chain: string; address: string }>;
+    chains: string[];
     coingeckoUrl: string;
     coinmarketcapUrl: string;
     sparkline7d: number[];
@@ -121,7 +127,14 @@ interface CoinGeckoCoinDetailResponse {
     links?: {
         homepage?: string[];
         blockchain_site?: string[];
+        official_forum_url?: string[];
+        chat_url?: string[];
+        announcement_url?: string[];
+        subreddit_url?: string;
+        twitter_screen_name?: string;
+        facebook_username?: string;
     };
+    platforms?: Record<string, string | null>;
     market_data?: {
         current_price?: {
             usd?: number;
@@ -440,6 +453,7 @@ async function getCoinPaprikaBreakdown(fetchFn: typeof fetch, coinId: string, ca
 
     return {
         id: coinId,
+        apiId: coinId,
         symbol: (coinPayload.symbol ?? cachedCoin?.symbol ?? coinId).toLowerCase(),
         name: coinPayload.name ?? cachedCoin?.name ?? coinId,
         image: cachedCoin?.image ?? '',
@@ -460,6 +474,11 @@ async function getCoinPaprikaBreakdown(fetchFn: typeof fetch, coinId: string, ca
         description: '',
         homepage: firstNonEmpty(coinPayload.links?.website),
         blockchainSite: firstNonEmpty(coinPayload.links?.explorer),
+        websites: normalizeUrlList(coinPayload.links?.website),
+        explorers: normalizeUrlList(coinPayload.links?.explorer),
+        community: [],
+        contracts: [],
+        chains: [],
         coingeckoUrl: `https://www.coingecko.com/en/coins/${coinId}`,
         coinmarketcapUrl: `https://coinmarketcap.com/currencies/${coinId}/`,
         sparkline7d,
@@ -739,6 +758,48 @@ function firstNonEmpty(values: string[] | undefined): string | null {
     return match ?? null;
 }
 
+function normalizeUrlList(values: Array<string | null | undefined> | undefined): string[] {
+    if (!values) {
+        return [];
+    }
+
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+
+    for (const value of values) {
+        if (typeof value !== 'string') {
+            continue;
+        }
+
+        const trimmed = value.trim();
+        if (!trimmed || !/^https?:\/\//i.test(trimmed) || seen.has(trimmed)) {
+            continue;
+        }
+
+        seen.add(trimmed);
+        normalized.push(trimmed);
+    }
+
+    return normalized;
+}
+
+function normalizeCommunityLinks(links: Array<{ label: string; url: string }>): Array<{ label: string; url: string }> {
+    const seen = new Set<string>();
+    const normalized: Array<{ label: string; url: string }> = [];
+
+    for (const link of links) {
+        const url = link.url.trim();
+        if (!url || !/^https?:\/\//i.test(url) || seen.has(url)) {
+            continue;
+        }
+
+        seen.add(url);
+        normalized.push({ label: link.label, url });
+    }
+
+    return normalized;
+}
+
 function toPlainText(html: string | undefined): string {
     if (!html) {
         return '';
@@ -764,6 +825,7 @@ function toCoinBreakdownFromCache(coin: MarketCoin): CoinBreakdown {
 
     return {
         id: coin.id,
+        apiId: coin.id,
         symbol: coin.symbol,
         name: coin.name,
         image: coin.image,
@@ -784,6 +846,11 @@ function toCoinBreakdownFromCache(coin: MarketCoin): CoinBreakdown {
         description: '',
         homepage: null,
         blockchainSite: null,
+        websites: [],
+        explorers: [],
+        community: [],
+        contracts: [],
+        chains: [],
         coingeckoUrl: `https://www.coingecko.com/en/coins/${coin.id}`,
         coinmarketcapUrl: `https://coinmarketcap.com/currencies/${coin.id}/`,
         sparkline7d: coin.sparkline7d,
@@ -1044,8 +1111,30 @@ export async function getCoinBreakdown(fetchFn: typeof fetch, coinId: string): P
             });
         }
 
+        const websites = normalizeUrlList(payload.links?.homepage);
+        const explorers = normalizeUrlList(payload.links?.blockchain_site);
+        const community = normalizeCommunityLinks([
+            ...normalizeUrlList(payload.links?.official_forum_url).map((url) => ({ label: 'Forum', url })),
+            ...normalizeUrlList(payload.links?.chat_url).map((url) => ({ label: 'Chat', url })),
+            ...normalizeUrlList(payload.links?.announcement_url).map((url) => ({ label: 'Announcement', url })),
+            ...(payload.links?.subreddit_url
+                ? [{ label: 'Reddit', url: payload.links.subreddit_url }]
+                : []),
+            ...(payload.links?.twitter_screen_name
+                ? [{ label: 'X', url: `https://x.com/${payload.links.twitter_screen_name}` }]
+                : []),
+            ...(payload.links?.facebook_username
+                ? [{ label: 'Facebook', url: `https://facebook.com/${payload.links.facebook_username}` }]
+                : [])
+        ]);
+        const contracts = Object.entries(payload.platforms ?? {})
+            .filter(([, address]) => typeof address === 'string' && address.trim().length > 0)
+            .map(([chain, address]) => ({ chain, address: (address ?? '').trim() }));
+        const chains = contracts.map((entry) => entry.chain);
+
         return {
             id: payload.id,
+            apiId: payload.id,
             symbol: payload.symbol,
             name: payload.name,
             image: payload.image?.large ?? cachedCoin?.image ?? '',
@@ -1064,8 +1153,13 @@ export async function getCoinBreakdown(fetchFn: typeof fetch, coinId: string): P
             allTimeLowDate: marketData?.atl_date?.usd ?? null,
             categories: payload.categories ?? [],
             description: toPlainText(payload.description?.en),
-            homepage: firstNonEmpty(payload.links?.homepage),
-            blockchainSite: firstNonEmpty(payload.links?.blockchain_site),
+            homepage: websites[0] ?? null,
+            blockchainSite: explorers[0] ?? null,
+            websites,
+            explorers,
+            community,
+            contracts,
+            chains,
             coingeckoUrl: `https://www.coingecko.com/en/coins/${payload.id}`,
             coinmarketcapUrl: `https://coinmarketcap.com/currencies/${payload.id}/`,
             sparkline7d: sparkline.length > 1 ? sparkline : [marketData?.current_price?.usd ?? 0, marketData?.current_price?.usd ?? 0],

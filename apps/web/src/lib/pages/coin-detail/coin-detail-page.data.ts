@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 
 interface CoinBreakdown {
     id: string;
+    apiId: string;
     symbol: string;
     name: string;
     image: string;
@@ -22,6 +23,11 @@ interface CoinBreakdown {
     description: string;
     homepage: string | null;
     blockchainSite: string | null;
+    websites: string[];
+    explorers: string[];
+    community: Array<{ label: string; url: string }>;
+    contracts: Array<{ chain: string; address: string }>;
+    chains: string[];
     coingeckoUrl: string;
     coinmarketcapUrl: string;
     sparkline7d: number[];
