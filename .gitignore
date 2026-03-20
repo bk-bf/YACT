@@ -1,7 +1,6 @@
 # Temporary ignores
 .github/
 .docs/
-Agents.md
 .vscode/
 
 # Environment and secrets
