@@ -1,6 +1,6 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import { page } from "$app/stores";
+    import { navigating, page } from "$app/stores";
 
     interface GlobalMarketSummary {
         totalMarketCapUsd: number;
@@ -147,6 +147,13 @@
 </script>
 
 <div class="app-shell">
+    <div
+        class={`route-progress ${$navigating ? "active" : ""}`}
+        aria-hidden="true"
+    >
+        <span class="route-progress-bar"></span>
+    </div>
+
     {#if sharedGlobal ?? ($page.data?.global as GlobalMarketSummary | undefined)}
         {@const global =
             sharedGlobal ?? ($page.data?.global as GlobalMarketSummary)}
