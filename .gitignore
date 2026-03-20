@@ -49,6 +49,7 @@ pip-wheel-metadata/
 
 # Caches, logs, and local runtime artifacts
 .cache/
+.runtime/
 *.log
 dump.rdb
 

@@ -1,15 +1,13 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { dev } from '$app/environment';
 
 import type { CryptoHeadline } from './headlines';
-import { getDataDir } from './dataPaths';
 import { persistHeadlinesSnapshot as persistToDatabase } from './persistentDatabaseWrite';
 
 const SNAPSHOT_VERSION = 1;
-const SNAPSHOT_DIR = getDataDir();
-const SNAPSHOT_FILE = path.join(SNAPSHOT_DIR, 'headlines-snapshot.json');
-const SNAPSHOT_BACKUP_FILE = path.join(SNAPSHOT_DIR, 'headlines-snapshot.backup.json');
 const SNAPSHOT_LOG_PREFIX = '[headlines-snapshot]';
+const ANALYTICS_BASE_URL = dev
+    ? process.env.YACT_ANALYTICS_URL || 'http://localhost:8000'
+    : process.env.YACT_ANALYTICS_URL || 'https://analytics.yact.local';
 
 interface PersistentHeadlinesSnapshot {
     v: number;
@@ -68,10 +66,16 @@ function normalizeSnapshotLike(value: unknown): PersistentHeadlinesSnapshot | nu
     };
 }
 
-async function tryReadSnapshotFile(filePath: string): Promise<PersistentHeadlinesSnapshot | null> {
+async function readSnapshotFromApi(): Promise<PersistentHeadlinesSnapshot | null> {
     try {
-        const raw = await readFile(filePath, 'utf-8');
-        const parsed = JSON.parse(raw);
+        const response = await fetch(`${ANALYTICS_BASE_URL}/api/v1/headlines`, {
+            headers: { Accept: 'application/json' }
+        });
+        if (!response.ok) {
+            return null;
+        }
+
+        const parsed = await response.json();
 
         if (isValidSnapshot(parsed)) {
             return parsed;
@@ -79,34 +83,19 @@ async function tryReadSnapshotFile(filePath: string): Promise<PersistentHeadline
 
         const migrated = normalizeSnapshotLike(parsed);
         if (migrated) {
-            console.warn(`${SNAPSHOT_LOG_PREFIX} migrated snapshot payload from ${filePath}`);
+            console.warn(`${SNAPSHOT_LOG_PREFIX} migrated snapshot payload from API`);
             return migrated;
         }
 
         return null;
     } catch (error) {
-        if (isObject(error) && error.code === 'ENOENT') {
-            return null;
-        }
-
-        console.error(`${SNAPSHOT_LOG_PREFIX} failed to read ${filePath}:`, error);
+        console.error(`${SNAPSHOT_LOG_PREFIX} failed to read API headlines:`, error);
         return null;
     }
 }
 
 export async function readPersistentHeadlinesSnapshot(): Promise<PersistentHeadlinesSnapshot | null> {
-    const primary = await tryReadSnapshotFile(SNAPSHOT_FILE);
-    if (primary) {
-        return primary;
-    }
-
-    const backup = await tryReadSnapshotFile(SNAPSHOT_BACKUP_FILE);
-    if (backup) {
-        console.warn(`${SNAPSHOT_LOG_PREFIX} recovered snapshot from backup file`);
-        return backup;
-    }
-
-    return null;
+    return readSnapshotFromApi();
 }
 
 export async function writePersistentHeadlinesSnapshot(source: string, headlines: CryptoHeadline[]): Promise<void> {
@@ -121,19 +110,10 @@ export async function writePersistentHeadlinesSnapshot(source: string, headlines
         headlines
     };
 
-    try {
-        await mkdir(SNAPSHOT_DIR, { recursive: true });
-        const serialized = JSON.stringify(snapshot);
-        const tempFile = `${SNAPSHOT_FILE}.tmp`;
-        await writeFile(tempFile, serialized, 'utf-8');
-        await rename(tempFile, SNAPSHOT_FILE);
-        await writeFile(SNAPSHOT_BACKUP_FILE, serialized, 'utf-8');
-
-        // Also persist to database (non-blocking)
-        persistToDatabase(snapshot).catch((error) => {
-            console.error(`${SNAPSHOT_LOG_PREFIX} failed to sync to database:`, error);
-        });
-    } catch (error) {
-        console.error(`${SNAPSHOT_LOG_PREFIX} failed to write headlines snapshot:`, error);
+    const result = await persistToDatabase(snapshot);
+    if (!result.success) {
+        throw new Error(result.error ?? 'unknown error');
     }
+
+    console.info(`${SNAPSHOT_LOG_PREFIX} wrote headlines snapshot to API (count=${headlines.length})`);
 }

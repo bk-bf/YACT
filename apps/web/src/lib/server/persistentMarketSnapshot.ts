@@ -1,16 +1,14 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { dev } from '$app/environment';
 
 import type { MarketCoin } from '../types/market';
 import type { GlobalMarketSummary } from './coingecko';
-import { getDataDir } from './dataPaths';
 import { persistMarketSnapshot as persistToDatabase } from './persistentDatabaseWrite';
 
 const SNAPSHOT_VERSION = 1;
-const SNAPSHOT_DIR = getDataDir();
-const SNAPSHOT_FILE = path.join(SNAPSHOT_DIR, 'markets-snapshot.json');
-const SNAPSHOT_BACKUP_FILE = path.join(SNAPSHOT_DIR, 'markets-snapshot.backup.json');
 const SNAPSHOT_LOG_PREFIX = '[market-snapshot]';
+const ANALYTICS_BASE_URL = dev
+    ? process.env.YACT_ANALYTICS_URL || 'http://localhost:8000'
+    : process.env.YACT_ANALYTICS_URL || 'https://analytics.yact.local';
 
 export interface PersistentMarketSnapshot {
     v: number;
@@ -57,64 +55,44 @@ function normalizeSnapshotLike(value: unknown): PersistentMarketSnapshot | null 
     };
 }
 
-async function tryReadSnapshotFile(filePath: string): Promise<PersistentMarketSnapshot | null> {
+async function readSnapshotFromApi(): Promise<PersistentMarketSnapshot | null> {
     try {
-        const raw = await readFile(filePath, 'utf-8');
-        const parsed = JSON.parse(raw);
+        const response = await fetch(`${ANALYTICS_BASE_URL}/api/v1/markets`, {
+            headers: { Accept: 'application/json' }
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const parsed = await response.json();
         if (isValidSnapshot(parsed)) {
             return parsed;
         }
 
         const migrated = normalizeSnapshotLike(parsed);
         if (migrated) {
-            console.warn(`${SNAPSHOT_LOG_PREFIX} migrated snapshot payload from ${filePath}`);
+            console.warn(`${SNAPSHOT_LOG_PREFIX} migrated snapshot payload from API`);
             return migrated;
         }
 
         return null;
     } catch (error) {
-        if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
-            return null;
-        }
-
-        console.error(`${SNAPSHOT_LOG_PREFIX} failed to read snapshot from ${filePath}:`, error);
+        console.error(`${SNAPSHOT_LOG_PREFIX} failed to read snapshot from API:`, error);
         return null;
     }
 }
 
 export async function readPersistentMarketSnapshot(): Promise<PersistentMarketSnapshot | null> {
-    // Try to read from API first (primary source)
-    try {
-        const API_BASE_URL = process.env.YACT_ANALYTICS_URL || "http://localhost:8000";
-        const response = await fetch(`${API_BASE_URL}/api/v1/markets`, {
-            headers: { 'Accept': 'application/json' }
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            console.info(
-                `${SNAPSHOT_LOG_PREFIX} loaded snapshot from API ` +
-                `(source=${data.source}, count=${data.count})`
-            );
-            return data;
-        }
-    } catch (error) {
-        console.warn(`${SNAPSHOT_LOG_PREFIX} failed to read from API, falling back to files:`, error);
-    }
-
-    // Fall back to file-based snapshot
-    const primary = await tryReadSnapshotFile(SNAPSHOT_FILE);
-    const snapshot = primary ?? await tryReadSnapshotFile(SNAPSHOT_BACKUP_FILE);
+    const snapshot = await readSnapshotFromApi();
 
     if (!snapshot) {
-        console.info(`${SNAPSHOT_LOG_PREFIX} no readable snapshot file found`);
+        console.warn(`${SNAPSHOT_LOG_PREFIX} no readable snapshot from API`);
         return null;
     }
-
-    const sourceFile = primary ? SNAPSHOT_FILE : SNAPSHOT_BACKUP_FILE;
     const ageSeconds = Math.max(0, Math.floor((Date.now() - snapshot.ts) / 1000));
     console.info(
-        `${SNAPSHOT_LOG_PREFIX} loaded snapshot from ${sourceFile} ` +
+        `${SNAPSHOT_LOG_PREFIX} loaded snapshot from API ` +
         `(source=${snapshot.source}, count=${snapshot.count}, age_s=${ageSeconds})`
     );
 
@@ -135,24 +113,13 @@ export async function writePersistentMarketSnapshot(
         global
     };
 
-    try {
-        await mkdir(SNAPSHOT_DIR, { recursive: true });
-        const serialized = JSON.stringify(snapshot);
-        const tempFile = `${SNAPSHOT_FILE}.tmp`;
-        await writeFile(tempFile, serialized, 'utf-8');
-        await rename(tempFile, SNAPSHOT_FILE);
-        await writeFile(SNAPSHOT_BACKUP_FILE, serialized, 'utf-8');
-        console.info(
-            `${SNAPSHOT_LOG_PREFIX} wrote snapshot to ${SNAPSHOT_FILE} ` +
-            `(source=${source}, count=${coins.length}, ts=${snapshot.ts})`
-        );
-
-        // Also persist to database (non-blocking)
-        persistToDatabase(snapshot).catch((error) => {
-            console.error(`${SNAPSHOT_LOG_PREFIX} failed to sync to database:`, error);
-        });
-    } catch (error) {
-        console.error(`${SNAPSHOT_LOG_PREFIX} failed to write snapshot to ${SNAPSHOT_FILE}:`, error);
-        throw error;
+    const result = await persistToDatabase(snapshot);
+    if (!result.success) {
+        throw new Error(result.error ?? 'unknown error');
     }
+
+    console.info(
+        `${SNAPSHOT_LOG_PREFIX} wrote snapshot to API ` +
+        `(source=${source}, count=${coins.length}, ts=${snapshot.ts})`
+    );
 }

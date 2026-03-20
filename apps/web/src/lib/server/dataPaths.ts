@@ -8,5 +8,5 @@ export function getDataDir(): string {
             : path.join(process.cwd(), configured);
     }
 
-    return path.join(process.cwd(), '.cache');
+    return path.join(process.cwd(), '.runtime');
 }

@@ -1,8 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-
 import type { MarketCoin } from '../types/market';
-import { getDataDir } from './dataPaths';
 import { readPersistentMarketSnapshot } from './persistentMarketSnapshot';
 
 const COINGECKO_MARKETS_ENDPOINT =
@@ -13,7 +9,6 @@ const COINGECKO_ASSET_PLATFORMS_ENDPOINT = 'https://api.coingecko.com/api/v3/ass
 const CRYPTOCOMPARE_API_BASE = 'https://min-api.cryptocompare.com/data/v2';
 const COINPAPRIKA_API_BASE = 'https://api.coinpaprika.com/v1';
 const PLATFORM_LOGO_CACHE_TTL_MS = 14 * 24 * 60 * 60_000;
-const PLATFORM_LOGO_CACHE_FILE = path.join(getDataDir(), 'coingecko-platforms.json');
 
 const MARKET_CACHE_TTL_MS = 60_000;
 const CHART_DEBUG_PREFIX = '[chart-debug]';
@@ -359,38 +354,10 @@ function extractPlatformLogoUrl(platform: CoinGeckoAssetPlatformResponse): strin
     return null;
 }
 
-async function readPlatformLogoCacheFromDisk(): Promise<PlatformLogoCache | null> {
-    try {
-        const raw = await readFile(PLATFORM_LOGO_CACHE_FILE, 'utf8');
-        const parsed = JSON.parse(raw) as Partial<PlatformLogoCache>;
-        if (typeof parsed?.fetchedAt !== 'number' || !parsed.byKey || typeof parsed.byKey !== 'object') {
-            return null;
-        }
-
-        return {
-            fetchedAt: parsed.fetchedAt,
-            byKey: parsed.byKey as Record<string, string>
-        };
-    } catch {
-        return null;
-    }
-}
-
-async function writePlatformLogoCacheToDisk(cache: PlatformLogoCache): Promise<void> {
-    await mkdir(path.dirname(PLATFORM_LOGO_CACHE_FILE), { recursive: true });
-    await writeFile(PLATFORM_LOGO_CACHE_FILE, JSON.stringify(cache), 'utf8');
-}
-
 async function getPlatformLogoCache(fetchFn: typeof fetch): Promise<PlatformLogoCache | null> {
     const now = Date.now();
     if (platformLogoCache && now - platformLogoCache.fetchedAt < PLATFORM_LOGO_CACHE_TTL_MS) {
         return platformLogoCache;
-    }
-
-    const diskCache = await readPlatformLogoCacheFromDisk();
-    if (diskCache && now - diskCache.fetchedAt < PLATFORM_LOGO_CACHE_TTL_MS) {
-        platformLogoCache = diskCache;
-        return diskCache;
     }
 
     try {
@@ -404,8 +371,7 @@ async function getPlatformLogoCache(fetchFn: typeof fetch): Promise<PlatformLogo
         );
 
         if (!response.ok) {
-            platformLogoCache = diskCache;
-            return diskCache;
+            return platformLogoCache;
         }
 
         const payload = (await response.json()) as CoinGeckoAssetPlatformResponse[];
@@ -433,11 +399,9 @@ async function getPlatformLogoCache(fetchFn: typeof fetch): Promise<PlatformLogo
             byKey
         };
         platformLogoCache = cache;
-        void writePlatformLogoCacheToDisk(cache);
         return cache;
     } catch {
-        platformLogoCache = diskCache;
-        return diskCache;
+        return platformLogoCache;
     }
 }
 
