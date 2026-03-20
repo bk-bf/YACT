@@ -521,10 +521,6 @@
 
         return hoverDateTime.format(new Date(hoverTimestamp));
     });
-    const activeRangeError = $derived(
-        chartRangeErrorByRange[chartRange] ?? null,
-    );
-
     $effect(() => {
         const range = chartRange;
         const prices = filteredChartPrices;
@@ -879,12 +875,6 @@
         </div>
 
         <div class="coin-widget-wrap" aria-label={`${coin.name} custom chart`}>
-            {#if activeRangeError}
-                <p class="coin-chart-status">
-                    {chartRangeConfig[chartRange].label} data is not in DB yet. Auto-refresh
-                    is running in the background.
-                </p>
-            {/if}
             <svg
                 bind:this={chartSvg}
                 viewBox={`0 0 ${chartWidth} ${chartHeight}`}

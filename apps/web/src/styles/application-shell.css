@@ -1148,17 +1148,6 @@ a {
     margin-left: 0;
 }
 
-.coin-chart-status {
-    margin: 0 0 0.55rem;
-    padding: 0.38rem 0.55rem;
-    border: 1px solid #2f3a33;
-    border-radius: 6px;
-    background: rgba(14, 19, 18, 0.75);
-    color: #b9c8bc;
-    font-size: 0.76rem;
-    font-weight: 600;
-}
-
 .coin-custom-chart {
     display: block;
     width: 100%;
