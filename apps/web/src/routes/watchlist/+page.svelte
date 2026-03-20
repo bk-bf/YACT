@@ -1,6 +1,54 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
     import M3Surface from "../../lib/components/M3Surface.svelte";
     import M3Button from "../../lib/components/M3Button.svelte";
+    import { useProgressiveDataLoad } from "../../lib/composables/useProgressiveDataLoad.svelte";
+    import { loadWatchlistPageData } from "../../lib/pages/watchlist/watchlist-page.data";
+
+    let { data } = $props();
+    const { viewData, loadCritical } = useProgressiveDataLoad(() => data);
+
+    const usd = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2,
+    });
+
+    const compactUsd = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        notation: "compact",
+        maximumFractionDigits: 2,
+    });
+
+    const percent = new Intl.NumberFormat("en-US", {
+        style: "percent",
+        maximumFractionDigits: 2,
+        signDisplay: "always",
+    });
+
+    const btc = $derived(viewData.items[0]);
+    const eth = $derived(viewData.items[1]);
+
+    function formatPrice(value: number): string {
+        return value > 0 ? usd.format(value) : "--";
+    }
+
+    function formatPercent(value: number): string {
+        return value !== 0 ? percent.format(value / 100) : "--";
+    }
+
+    function formatVolume(value: number): string {
+        return value > 0 ? compactUsd.format(value) : "--";
+    }
+
+    $effect(() => {
+        if (!browser) {
+            return;
+        }
+
+        void loadCritical(() => loadWatchlistPageData(fetch));
+    });
 </script>
 
 <svelte:head>
@@ -20,10 +68,9 @@
                 Tracking halving-cycle context with baseline probability
                 signals.
             </p>
-            <!-- TODO(T-003, see .docs/features/open/ROADMAP.md): Replace placeholder metric chips with computed BTC indicators. -->
-            <span class="metric-chip">Halving phase</span>
-            <span class="metric-chip">MVRV</span>
-            <span class="metric-chip">SOPR</span>
+            <span class="metric-chip">Price: {formatPrice(btc.currentPrice)}</span>
+            <span class="metric-chip">24h: {formatPercent(btc.priceChangePercentage24h)}</span>
+            <span class="metric-chip">Volume: {formatVolume(btc.totalVolume24h)}</span>
         </article>
 
         <!-- TODO(T-004, see .docs/features/open/ROADMAP.md): Replace placeholder ETH card with real watchlist module fed by live data. -->
@@ -32,10 +79,9 @@
             <p>
                 Short-term trend and liquidity context for watchlist comparison.
             </p>
-            <!-- TODO(T-006, see .docs/features/open/ROADMAP.md): Replace placeholder metric chips with computed ETH indicators. -->
-            <span class="metric-chip">Volume</span>
-            <span class="metric-chip">Funding rate</span>
-            <span class="metric-chip">Exchange flows</span>
+            <span class="metric-chip">Price: {formatPrice(eth.currentPrice)}</span>
+            <span class="metric-chip">24h: {formatPercent(eth.priceChangePercentage24h)}</span>
+            <span class="metric-chip">Volume: {formatVolume(eth.totalVolume24h)}</span>
         </article>
     </div>
 

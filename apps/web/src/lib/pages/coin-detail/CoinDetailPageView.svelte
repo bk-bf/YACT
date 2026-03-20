@@ -5,7 +5,7 @@
         loadCoinDetailAuxData,
         loadCoinDetailCriticalOnlyData,
     } from "./coin-detail-page.data";
-    import { useProgressiveDataLoad } from "../../composables/useProgressiveDataLoad";
+    import { useProgressiveDataLoad } from "../../composables/useProgressiveDataLoad.svelte";
 
     let { data } = $props();
     const { viewData, loadCritical, loadAuxiliary } = useProgressiveDataLoad(

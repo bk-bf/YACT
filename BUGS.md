@@ -1,5 +1,18 @@
 # BUGS
 
+## 2026-03-20 - Progressive rendering composable is now the default route-page pattern
+
+- Status: fixed
+- Area: web route pages and page views
+- Pattern for future pages:
+	- `+page.ts` returns an immediate fallback shape from a local `*.data.ts` constructor.
+	- Route/page view uses `useProgressiveDataLoad(() => data)`.
+	- Client mount calls `loadCritical(...)` for required data first and optionally `loadAuxiliary(...)` for non-blocking enrichments.
+	- Async merges must be stale-safe (request-id guarded by the composable).
+- Applied in current code:
+	- Markets page view and coin detail page view.
+	- Watchlist route `+page.svelte` with fallback loader and critical refresh.
+
 ## 2026-03-20 - Coin detail page blocked on slow market API before showing any real data
 
 - Status: fixed

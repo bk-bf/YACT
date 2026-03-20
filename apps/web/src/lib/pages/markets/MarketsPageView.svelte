@@ -2,7 +2,7 @@
     import { browser } from "$app/environment";
     import M3Button from "../../components/M3Button.svelte";
     import { loadMarketsPageData } from "./markets-page.data";
-    import { useProgressiveDataLoad } from "../../composables/useProgressiveDataLoad";
+    import { useProgressiveDataLoad } from "../../composables/useProgressiveDataLoad.svelte";
 
     let { data } = $props();
     const { viewData, loadCritical } = useProgressiveDataLoad(() => data);

@@ -10,6 +10,7 @@
 - **Svelte-first policy**: for `.svelte` and route work, follow this repository's conventions and keep components/routes strongly typed.
 - **Use repository scripts first**: prefer `./scripts/dev-web.sh` and `./scripts/check.sh` over ad-hoc commands.
 - **Avoid unnecessary dev server restarts**: if Vite is healthy, rely on hot reload.
+- **Mandatory post-change web probe**: after each yact-web code change, verify live HTTP response with curl against the active dev URL (default `http://localhost:5173`), at minimum for `/` and the route changed.
 - **Repository boundary**: do not edit files under `../yact-server/` unless explicitly requested.
 
 ## Troubleshooting Protocol
@@ -30,6 +31,7 @@ Required workflow:
 5. Correlate UI symptoms with relay logs and endpoint payloads.
 6. Classify incident: client-runtime, proxy-route, upstream-api, config/env, unknown.
 7. Apply fix and repeat the same capture to confirm resolution.
+8. After every code change, run curl probes to confirm non-500 responses from the active web URL (default `http://localhost:5173`) before reporting success.
 
 Use this minimal incident bundle command when investigating:
 
