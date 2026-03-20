@@ -114,7 +114,6 @@
         hour: "2-digit",
         minute: "2-digit",
     });
-    const CHART_CLIENT_DEBUG_PREFIX = "[chart-client-debug]";
 
     function buildLinePath(values: number[], min: number, max: number): string {
         if (values.length < 2) {
@@ -522,28 +521,6 @@
         return hoverDateTime.format(new Date(hoverTimestamp));
     });
     $effect(() => {
-        const range = chartRange;
-        const prices = filteredChartPrices;
-        const timestamps = filteredChartTimestamps;
-        const spanHours =
-            timestamps.length > 1
-                ? Math.floor(
-                      (timestamps[timestamps.length - 1] - timestamps[0]) /
-                          (1000 * 60 * 60),
-                  )
-                : 0;
-
-        console.info(CHART_CLIENT_DEBUG_PREFIX, {
-            phase: "render",
-            range,
-            points: prices.length,
-            spanHours,
-            firstTs: timestamps[0] ?? null,
-            lastTs: timestamps[timestamps.length - 1] ?? null,
-        });
-    });
-
-    $effect(() => {
         if (!browser) {
             return;
         }
@@ -585,14 +562,6 @@
                         if (payload.error) {
                             errorText = payload.error;
                         }
-                        if (payload.autoRefresh) {
-                            console.info(CHART_CLIENT_DEBUG_PREFIX, {
-                                phase: "auto-refresh-status",
-                                coinId: coin.id,
-                                range,
-                                status: payload.autoRefresh,
-                            });
-                        }
                     } catch {
                         // Keep default error text.
                     }
@@ -625,15 +594,6 @@
                         } | null;
                     };
                 };
-
-                if (payload.autoRefresh) {
-                    console.info(CHART_CLIENT_DEBUG_PREFIX, {
-                        phase: "auto-refresh-status",
-                        coinId: coin.id,
-                        range,
-                        status: payload.autoRefresh,
-                    });
-                }
 
                 const prices =
                     payload.prices?.filter((value) => Number.isFinite(value)) ??
@@ -682,42 +642,16 @@
                 };
 
                 if (payload.warning) {
-                    console.warn(CHART_CLIENT_DEBUG_PREFIX, {
+                    console.warn("[coin-chart]", {
                         phase: "fetch-warning",
                         coinId: coin.id,
                         range,
                         warning: payload.warning,
                     });
                 }
-
-                const effectiveTs =
-                    timestamps.length === prices.length
-                        ? timestamps
-                        : buildSyntheticTimestamps(
-                              prices.length,
-                              getRangeDurationHours(range, prices.length),
-                          );
-                const spanHours =
-                    effectiveTs.length > 1
-                        ? Math.floor(
-                              (effectiveTs[effectiveTs.length - 1] -
-                                  effectiveTs[0]) /
-                                  (1000 * 60 * 60),
-                          )
-                        : 0;
-                console.info(CHART_CLIENT_DEBUG_PREFIX, {
-                    phase: "fetch",
-                    coinId: coin.id,
-                    range,
-                    status: response.status,
-                    points: prices.length,
-                    spanHours,
-                    firstTs: effectiveTs[0] ?? null,
-                    lastTs: effectiveTs[effectiveTs.length - 1] ?? null,
-                });
             })
             .catch((error) => {
-                console.warn(CHART_CLIENT_DEBUG_PREFIX, {
+                console.warn("[coin-chart]", {
                     phase: "fetch-error",
                     coinId: coin.id,
                     range,
@@ -725,109 +659,6 @@
                         error instanceof Error ? error.message : String(error),
                 });
             });
-    });
-
-    $effect(() => {
-        if (!browser) {
-            return;
-        }
-
-        let cancelled = false;
-
-        const poll = async () => {
-            try {
-                const response = await fetch(
-                    `/api/debug/auto-refresh?limit=6&_ts=${Date.now()}`,
-                    {
-                        cache: "no-store",
-                    },
-                );
-                if (!response.ok) {
-                    return;
-                }
-
-                const payload = (await response.json()) as {
-                    status?: {
-                        intervalMs: number;
-                        schedulerStarted: boolean;
-                        running: boolean;
-                        nextCycleAt: number | null;
-                        cycleCount: number;
-                        lastCycleStartedAt: number | null;
-                        lastCycleFinishedAt: number | null;
-                        lastCycleOk: boolean | null;
-                        lastCycleError: string | null;
-                        lastSweepCoinCount: number;
-                    };
-                    events?: Array<{ ts: number; type: string }>;
-                };
-
-                if (cancelled || !payload.status) {
-                    return;
-                }
-
-                const latestEvent =
-                    payload.events?.[payload.events.length - 1] ?? null;
-                const failedByEvent =
-                    latestEvent?.type === "cycle-failed" ||
-                    latestEvent?.type === "ad-hoc-coin-failed";
-                const successByEvent =
-                    latestEvent?.type === "cycle-success" ||
-                    latestEvent?.type === "ad-hoc-coin-success";
-                const lastOutcome =
-                    failedByEvent || payload.status.lastCycleOk === false
-                        ? "failure"
-                        : successByEvent || payload.status.lastCycleOk === true
-                          ? "success"
-                          : "unknown";
-                const outcome = payload.status.running
-                    ? `running-${lastOutcome}`
-                    : lastOutcome;
-                const nextCycleInSec = payload.status.nextCycleAt
-                    ? Math.max(
-                          0,
-                          Math.round(
-                              (payload.status.nextCycleAt - Date.now()) / 1000,
-                          ),
-                      )
-                    : null;
-                const logger =
-                    outcome === "failure" ? console.warn : console.info;
-
-                logger(CHART_CLIENT_DEBUG_PREFIX, {
-                    phase: "auto-refresh-poll",
-                    outcome,
-                    currentState: payload.status.running ? "running" : "idle",
-                    lastOutcome,
-                    cycleCount: payload.status.cycleCount,
-                    nextCycleInSec,
-                    lastCycleOk: payload.status.lastCycleOk,
-                    lastCycleError: payload.status.lastCycleError,
-                    status: payload.status,
-                    latestEvent,
-                });
-            } catch (error) {
-                if (!cancelled) {
-                    console.warn(CHART_CLIENT_DEBUG_PREFIX, {
-                        phase: "auto-refresh-poll-error",
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : String(error),
-                    });
-                }
-            }
-        };
-
-        void poll();
-        const timer = window.setInterval(() => {
-            void poll();
-        }, 20_000);
-
-        return () => {
-            cancelled = true;
-            window.clearInterval(timer);
-        };
     });
 </script>
 
