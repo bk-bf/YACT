@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .PHONY: dev-web lint test ci
 
 dev-web:
-	npm run dev:web
+	./scripts/dev-web.sh
 
 lint:
 	npm run ci:lint

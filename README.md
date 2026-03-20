@@ -23,6 +23,7 @@ Backend services moved to the standalone `yact-server` repo. This web repo consu
 ## Local run scripts
 
 - `npm run dev:web`: start the SvelteKit app
+- `./scripts/dev-web.sh [api_url]`: start web app with analytics API preflight (example: `./scripts/dev-web.sh http://ubuntuserver:8000`)
 - `make lint`: run web and schema checks
 - `make test`: run web and schema tests
 - `scripts/check.sh`: run lint/test checks in one command
