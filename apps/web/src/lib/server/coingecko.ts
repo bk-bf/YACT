@@ -426,6 +426,11 @@ async function getCoinPaprikaBreakdown(fetchFn: typeof fetch, coinId: string, ca
     const usdQuote = tickerPayload.quotes?.USD;
 
     const currentPrice = usdQuote?.price ?? cachedCoin?.currentPrice ?? 0;
+    const atlFromHistory = await fetchCryptoCompareChartSeries(
+        coinPayload.symbol ?? cachedCoin?.symbol ?? coinId,
+        'max',
+        Math.floor(Date.now() / 1000)
+    ).then((series) => (series ? deriveAllTimeLowFromSeries(series) : null)).catch(() => null);
     const sparkline7d = cachedCoin?.sparkline7d?.length && cachedCoin.sparkline7d.length > 1
         ? cachedCoin.sparkline7d
         : [currentPrice, currentPrice];
@@ -449,8 +454,8 @@ async function getCoinPaprikaBreakdown(fetchFn: typeof fetch, coinId: string, ca
         priceChangePercentage24h: usdQuote?.percent_change_24h ?? cachedCoin?.priceChangePercentage24h ?? 0,
         allTimeHigh: usdQuote?.ath_price ?? 0,
         allTimeHighDate: usdQuote?.ath_date ?? null,
-        allTimeLow: 0,
-        allTimeLowDate: null,
+        allTimeLow: atlFromHistory?.allTimeLow ?? 0,
+        allTimeLowDate: atlFromHistory?.allTimeLowDate ?? null,
         categories: [],
         description: '',
         homepage: firstNonEmpty(coinPayload.links?.website),
@@ -656,6 +661,39 @@ function derive24hRangeFromSparkline(sparkline: number[], currentPrice: number):
     return {
         low24h: Math.min(...values),
         high24h: Math.max(...values)
+    };
+}
+
+function deriveAllTimeLowFromSeries(
+    series: CoinChartSeries
+): { allTimeLow: number; allTimeLowDate: string | null } | null {
+    if (!series.prices.length || series.prices.length !== series.timestamps.length) {
+        return null;
+    }
+
+    let minPrice = Number.POSITIVE_INFINITY;
+    let minTs: number | null = null;
+
+    for (let index = 0; index < series.prices.length; index += 1) {
+        const price = series.prices[index];
+        const ts = series.timestamps[index];
+        if (!Number.isFinite(price) || !Number.isFinite(ts)) {
+            continue;
+        }
+
+        if (price < minPrice) {
+            minPrice = price;
+            minTs = ts;
+        }
+    }
+
+    if (!Number.isFinite(minPrice) || minPrice <= 0) {
+        return null;
+    }
+
+    return {
+        allTimeLow: minPrice,
+        allTimeLowDate: minTs ? new Date(minTs).toISOString() : null
     };
 }
 
@@ -1046,7 +1084,22 @@ export async function getCoinBreakdown(fetchFn: typeof fetch, coinId: string): P
         }
 
         if (cachedCoin) {
-            return toCoinBreakdownFromCache(cachedCoin);
+            const cachedBreakdown = toCoinBreakdownFromCache(cachedCoin);
+            const atlFromHistory = await fetchCryptoCompareChartSeries(
+                cachedCoin.symbol,
+                'max',
+                Math.floor(Date.now() / 1000)
+            ).then((series) => (series ? deriveAllTimeLowFromSeries(series) : null)).catch(() => null);
+
+            if (!atlFromHistory) {
+                return cachedBreakdown;
+            }
+
+            return {
+                ...cachedBreakdown,
+                allTimeLow: atlFromHistory.allTimeLow,
+                allTimeLowDate: atlFromHistory.allTimeLowDate
+            };
         }
 
         throw new Error(`Coin breakdown unavailable for ${coinId}`);

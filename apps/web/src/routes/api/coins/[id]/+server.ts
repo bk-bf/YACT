@@ -3,12 +3,50 @@ import { json } from '@sveltejs/kit';
 import { ensureAutoRefreshStarted, refreshCoinNow } from '../../../../lib/server/autoRefreshService';
 import {
     readCoinBreakdownSnapshot,
+    readCoinChartSnapshot,
     writeCoinBreakdownSnapshot,
 } from '../../../../lib/server/persistentCoinSnapshot';
 import { readPersistentMarketSnapshot } from '../../../../lib/server/persistentMarketSnapshot';
 import type { MarketCoin } from '../../../../lib/types/market';
 
 const BREAKDOWN_STALE_MS = 10 * 60_000;
+
+async function deriveAtlFromPersistedCharts(coinId: string): Promise<{ allTimeLow: number; allTimeLowDate: string | null } | null> {
+    const ranges = ['max', '1y', 'ytd', '3m', '1m', '7d', '24h'] as const;
+    for (const range of ranges) {
+        const snapshot = await readCoinChartSnapshot(coinId, range);
+        const prices = snapshot?.value.prices ?? [];
+        const timestamps = snapshot?.value.timestamps ?? [];
+
+        if (prices.length < 2 || prices.length !== timestamps.length) {
+            continue;
+        }
+
+        let minPrice = Number.POSITIVE_INFINITY;
+        let minTs: number | null = null;
+        for (let index = 0; index < prices.length; index += 1) {
+            const price = prices[index];
+            const ts = timestamps[index];
+            if (!Number.isFinite(price) || !Number.isFinite(ts)) {
+                continue;
+            }
+
+            if (price < minPrice) {
+                minPrice = price;
+                minTs = ts;
+            }
+        }
+
+        if (Number.isFinite(minPrice) && minPrice > 0) {
+            return {
+                allTimeLow: minPrice,
+                allTimeLowDate: minTs ? new Date(minTs).toISOString() : null
+            };
+        }
+    }
+
+    return null;
+}
 
 function buildDerivedBreakdownFromMarketCoin(coin: MarketCoin) {
     const sparklineTail = coin.sparkline7d.length > 24 ? coin.sparkline7d.slice(-24) : coin.sparkline7d;
@@ -83,8 +121,22 @@ export async function GET({ fetch, params }) {
             high24h: persisted.value.high24h ?? computedHigh24h
         };
 
+        const hasAtl = coinWithDerivedRange.allTimeLow > 0;
+        const atlFallback = hasAtl ? null : await deriveAtlFromPersistedCharts(coinId);
+        const coinWithDerivedAtl = atlFallback
+            ? {
+                ...coinWithDerivedRange,
+                allTimeLow: atlFallback.allTimeLow,
+                allTimeLowDate: atlFallback.allTimeLowDate
+            }
+            : coinWithDerivedRange;
+
+        if (atlFallback) {
+            void writeCoinBreakdownSnapshot(coinId, coinWithDerivedAtl);
+        }
+
         return json({
-            coin: coinWithDerivedRange,
+            coin: coinWithDerivedAtl,
             stale: ageMs > BREAKDOWN_STALE_MS,
             source: 'db-cache',
             snapshotTs: persisted.ts
