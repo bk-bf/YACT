@@ -135,6 +135,34 @@
         return fixed.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
     }
 
+    function addThousandsSeparators(value: string): string {
+        const normalized = normalizeNumericInput(value);
+        if (!normalized) {
+            return "";
+        }
+
+        const hasTrailingDot = normalized.endsWith(".");
+        const [intPartRaw, decimalPart = ""] = normalized.split(".");
+        const intPart = intPartRaw.length > 0 ? intPartRaw : "0";
+        const groupedInt = intPart
+            .replace(/^0+(?=\d)/, "")
+            .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+        if (hasTrailingDot) {
+            return `${groupedInt}.`;
+        }
+
+        if (decimalPart.length > 0) {
+            return `${groupedInt}.${decimalPart}`;
+        }
+
+        return groupedInt;
+    }
+
+    function formatGroupedInputNumber(value: number, decimals: number): string {
+        return addThousandsSeparators(formatInputNumber(value, decimals));
+    }
+
     function handleConverterBtcInput(event: Event): void {
         const target = event.currentTarget as HTMLInputElement;
         converterLastEdited = "btc";
@@ -144,7 +172,7 @@
     function handleConverterUsdInput(event: Event): void {
         const target = event.currentTarget as HTMLInputElement;
         converterLastEdited = "usd";
-        converterUsdInput = normalizeNumericInput(target.value);
+        converterUsdInput = addThousandsSeparators(target.value);
     }
 
     $effect(() => {
@@ -156,7 +184,9 @@
         if (converterLastEdited === "btc") {
             const btcValue = parseNumericInput(converterBtcInput);
             converterUsdInput =
-                btcValue !== null ? formatInputNumber(btcValue * price, 2) : "";
+                btcValue !== null
+                    ? formatGroupedInputNumber(btcValue * price, 2)
+                    : "";
             return;
         }
 
