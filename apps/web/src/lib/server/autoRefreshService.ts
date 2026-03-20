@@ -1,3 +1,6 @@
+import { appendFile, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
 import {
     getCoinBreakdown,
     getCoinChartSeries,
@@ -15,6 +18,8 @@ const MARKET_SWEEP_LIMIT = 100;
 const AUTO_REFRESH_LOG_PREFIX = '[auto-refresh]';
 const QUEUE_LOG_PREFIX = '[refresh-queue]';
 const QUEUE_DEBUG_LOGS_ENABLED = process.env.YACT_QUEUE_DEBUG === '1';
+const AUTO_REFRESH_LOG_DIR = path.join(process.cwd(), '.cache');
+const AUTO_REFRESH_LOG_FILE = path.join(AUTO_REFRESH_LOG_DIR, 'auto-refresh.log');
 const CHART_RANGES: CoinChartRange[] = ['24h', '7d', '1m', '3m', 'ytd', '1y', 'max'];
 
 let autoRefreshStarted = false;
@@ -22,6 +27,7 @@ let autoRefreshTimer: NodeJS.Timeout | null = null;
 let autoRefreshRunning = false;
 let queueTimer: NodeJS.Timeout | null = null;
 let queueTaskRunning = false;
+let logWriteChain: Promise<void> = Promise.resolve();
 
 type RefreshPriority = 'critical' | 'high' | 'normal' | 'low';
 type RefreshTaskType = 'markets' | 'coin-full';
@@ -161,16 +167,39 @@ function toQueueSnapshot(limit = 25): Array<{
         }));
 }
 
+function appendAutoRefreshLog(scope: string, phase: string, detail: Record<string, unknown>): void {
+    const entry = {
+        ts: new Date().toISOString(),
+        scope,
+        phase,
+        ...detail
+    };
+    const line = `${JSON.stringify(entry)}\n`;
+
+    logWriteChain = logWriteChain
+        .then(async () => {
+            await mkdir(AUTO_REFRESH_LOG_DIR, { recursive: true });
+            await appendFile(AUTO_REFRESH_LOG_FILE, line, 'utf-8');
+        })
+        .catch(() => {
+            // Keep runtime path resilient even if file logging fails.
+        });
+}
+
 function logQueueDebug(phase: string, detail: Record<string, unknown> = {}): void {
+    const payload = {
+        ...detail,
+        queueLength: refreshQueue.size,
+        queue: toQueueSnapshot(15)
+    };
+
+    appendAutoRefreshLog('refresh-queue', phase, payload);
+
     if (!QUEUE_DEBUG_LOGS_ENABLED) {
         return;
     }
 
-    console.info(`${QUEUE_LOG_PREFIX} ${phase}`, {
-        ...detail,
-        queueLength: refreshQueue.size,
-        queue: toQueueSnapshot(15)
-    });
+    console.info(`${QUEUE_LOG_PREFIX} ${phase}`, payload);
 }
 
 export function getRefreshQueueSnapshot(limit = 25) {
