@@ -33,6 +33,7 @@ interface MarketsResponse {
     headlines: CryptoHeadline[];
     highlights: MarketHighlights;
     snapshotTs?: number;
+    ts?: number;
     stale?: boolean;
     error?: string;
 }
@@ -62,10 +63,17 @@ function normalizeMarketsPayload(payload: Partial<MarketsResponse> | null) {
         headlines: Array.isArray(safePayload.headlines) ? safePayload.headlines : [],
         highlights: safePayload.highlights ?? EMPTY_HIGHLIGHTS,
         source: safePayload.source ?? 'analytics-api',
-        snapshotTs: safePayload.snapshotTs ?? null,
+        snapshotTs: safePayload.snapshotTs ?? safePayload.ts ?? null,
         stale: safePayload.stale ?? false,
         error: safePayload.error ?? null
     };
+}
+
+export function createInitialMarketsPageData() {
+    return normalizeMarketsPayload({
+        stale: true,
+        error: null
+    });
 }
 
 export async function loadMarketsPageData(fetchFn: typeof fetch) {

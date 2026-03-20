@@ -37,8 +37,10 @@ export async function GET({ fetch }) {
         : { headlines: [] };
 
     const coins = Array.isArray(marketsPayload.coins) ? marketsPayload.coins : [];
+    const snapshotTs = typeof marketsPayload?.ts === 'number' ? marketsPayload.ts : null;
     return json({
         ...marketsPayload,
+        snapshotTs,
         headlines: Array.isArray(headlinesPayload.headlines) ? headlinesPayload.headlines : [],
         highlights: getHighlights(coins),
         stale: false

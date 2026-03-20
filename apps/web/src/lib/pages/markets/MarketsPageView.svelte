@@ -1,7 +1,7 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import { invalidateAll } from "$app/navigation";
     import M3Button from "../../components/M3Button.svelte";
+    import { loadMarketsPageData } from "./markets-page.data";
 
     let { data } = $props();
 
@@ -53,6 +53,11 @@
 
     const sparklineWidth = 140;
     const sparklineHeight = 42;
+    let initialDataLoaded = false;
+
+    async function refreshMarketsData(): Promise<void> {
+        data = await loadMarketsPageData(fetch);
+    }
 
     function sparklinePath(
         points: number[],
@@ -122,6 +127,19 @@
             return;
         }
 
+        if (initialDataLoaded) {
+            return;
+        }
+
+        initialDataLoaded = true;
+        void refreshMarketsData();
+    });
+
+    $effect(() => {
+        if (!browser) {
+            return;
+        }
+
         let cancelled = false;
         let lastSeenSnapshotTs = data.snapshotTs ?? null;
 
@@ -145,6 +163,11 @@
                     return;
                 }
 
+                if (lastSeenSnapshotTs === null) {
+                    lastSeenSnapshotTs = payload.marketSnapshotTs;
+                    return;
+                }
+
                 if (lastSeenSnapshotTs !== payload.marketSnapshotTs) {
                     const previousTs = lastSeenSnapshotTs;
                     lastSeenSnapshotTs = payload.marketSnapshotTs;
@@ -154,7 +177,7 @@
                         nextTs: payload.marketSnapshotTs,
                         reason: "market-db-updated",
                     });
-                    await invalidateAll();
+                    await refreshMarketsData();
                 }
             } catch (error) {
                 if (!cancelled) {

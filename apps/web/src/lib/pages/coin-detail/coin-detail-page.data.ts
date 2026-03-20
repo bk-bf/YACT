@@ -60,6 +60,7 @@ interface HighlightCoin {
 
 interface MarketsAuxResponse {
     snapshotTs?: number;
+    ts?: number;
     headlines?: CryptoHeadline[];
     highlights?: {
         trending?: HighlightCoin[];
@@ -206,6 +207,36 @@ function normalizeCoinBreakdown(raw: unknown, coinId: string, chart?: CoinChartR
     };
 }
 
+function fallbackCoinNameForId(coinId: string): string {
+    return coinId
+        .split('-')
+        .filter((part) => part.length > 0)
+        .map((part) => part[0].toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+export function createInitialCoinDetailPageData(coinId: string) {
+    const fallbackCoinName = fallbackCoinNameForId(coinId);
+    return {
+        coin: normalizeCoinBreakdown(
+            {
+                id: coinId,
+                apiId: coinId,
+                symbol: coinId,
+                name: fallbackCoinName || coinId,
+                source: 'unavailable'
+            },
+            coinId
+        ),
+        coinSnapshotTs: null,
+        stale: true,
+        marketsSnapshotTs: null,
+        headlines: [],
+        trending: [],
+        topGainers: []
+    };
+}
+
 export async function loadCoinDetailPageData(fetchFn: typeof fetch, coinId: string) {
     const [coinResult, chartResult, marketsResult] = await Promise.all([
         fetchJsonWithTimeout<CoinBreakdownResponse>(fetchFn, `/api/coins/${coinId}`, 4000),
@@ -224,7 +255,7 @@ export async function loadCoinDetailPageData(fetchFn: typeof fetch, coinId: stri
     let marketsSnapshotTs: number | null = null;
     if (marketsResult.ok && marketsResult.data) {
         const aux = marketsResult.data;
-        marketsSnapshotTs = aux.snapshotTs ?? null;
+        marketsSnapshotTs = aux.snapshotTs ?? aux.ts ?? null;
         headlines = aux.headlines ?? [];
         trending = aux.highlights?.trending ?? [];
         topGainers = aux.highlights?.topGainers ?? [];
@@ -232,11 +263,7 @@ export async function loadCoinDetailPageData(fetchFn: typeof fetch, coinId: stri
 
     const coinPayload = coinResult.ok ? coinResult.data : null;
     const hasCoin = Boolean(coinPayload?.coin);
-    const fallbackCoinName = coinId
-        .split('-')
-        .filter((part) => part.length > 0)
-        .map((part) => part[0].toUpperCase() + part.slice(1))
-        .join(' ');
+    const fallbackCoinName = fallbackCoinNameForId(coinId);
 
     return {
         coin: normalizeCoinBreakdown(

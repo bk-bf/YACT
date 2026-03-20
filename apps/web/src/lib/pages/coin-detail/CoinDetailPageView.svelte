@@ -1,7 +1,7 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import { invalidateAll } from "$app/navigation";
     import CoinTerminalChart from "../../components/CoinTerminalChart.svelte";
+    import { loadCoinDetailPageData } from "./coin-detail-page.data";
 
     let { data } = $props();
 
@@ -48,6 +48,11 @@
     });
 
     const HEADLINES_REORDER_COOLDOWN_MS = 45_000;
+    let initialDataLoaded = false;
+
+    async function refreshCoinData(): Promise<void> {
+        data = await loadCoinDetailPageData(fetch, coin.id);
+    }
 
     function formatOptionalDate(value: string | null): string {
         if (!value) return "--";
@@ -558,6 +563,19 @@
             return;
         }
 
+        if (initialDataLoaded) {
+            return;
+        }
+
+        initialDataLoaded = true;
+        void refreshCoinData();
+    });
+
+    $effect(() => {
+        if (!browser) {
+            return;
+        }
+
         let cancelled = false;
         let lastCoinSnapshotTs = data.coinSnapshotTs ?? null;
         let lastMarketSnapshotTs = data.marketsSnapshotTs ?? null;
@@ -579,6 +597,13 @@
 
                 if (cancelled) {
                     return;
+                }
+
+                if (lastCoinSnapshotTs === null && payload.coinSnapshotTs) {
+                    lastCoinSnapshotTs = payload.coinSnapshotTs;
+                }
+                if (lastMarketSnapshotTs === null && payload.marketSnapshotTs) {
+                    lastMarketSnapshotTs = payload.marketSnapshotTs;
                 }
 
                 const coinUpdated =
@@ -609,7 +634,7 @@
                             ? "coin-db-updated"
                             : "market-db-updated",
                     });
-                    await invalidateAll();
+                    await refreshCoinData();
                 }
             } catch (error) {
                 if (!cancelled) {
