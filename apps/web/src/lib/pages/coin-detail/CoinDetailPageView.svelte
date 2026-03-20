@@ -616,9 +616,7 @@
             } catch (error) {
                 if (!cancelled) {
                     const errorMessage =
-                        error instanceof Error
-                            ? error.message
-                            : String(error);
+                        error instanceof Error ? error.message : String(error);
                     if (
                         errorMessage.includes("NetworkError") ||
                         errorMessage.includes("Failed to fetch")
