@@ -104,8 +104,22 @@
         return value >= 1000 ? largeUsd.format(value) : fullUsd.format(value);
     }
 
+    function formatTwoDecimals(value: number | null | undefined): string {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return "--";
+        }
+        return value.toFixed(2);
+    }
+
+    function formatWhole(value: number | null | undefined): string {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return "--";
+        }
+        return fullInteger.format(value);
+    }
+
     function openCoinBreakdown(coinId: string): void {
-        void goto(`/currencies/${coinId}`);
+        void goto(`/currencies/${encodeURIComponent(coinId)}`);
     }
 
     function handleCoinRowKeydown(event: KeyboardEvent, coinId: string): void {
@@ -246,10 +260,10 @@
             <h3>{formatDetailedUsd(data.global.totalVolumeUsd)}</h3>
             <p>24h Trading Volume</p>
             <p class="muted">
-                BTC Dominance: {data.global.btcDominance.toFixed(2)}%
+                BTC Dominance: {formatTwoDecimals(data.global.btcDominance)}%
             </p>
             <p class="muted">
-                Active Cryptocurrencies: {fullInteger.format(
+                Active Cryptocurrencies: {formatWhole(
                     data.global.activeCryptocurrencies,
                 )}
             </p>

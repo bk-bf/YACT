@@ -86,6 +86,27 @@
         return value.toFixed(1);
     }
 
+    function formatOneDecimalPercent(value: number | null | undefined): string {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return "--";
+        }
+        return value.toFixed(1);
+    }
+
+    function formatCompactUsd(value: number | null | undefined): string {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return "--";
+        }
+        return compactUsd.format(value);
+    }
+
+    function formatInteger(value: number | null | undefined): string {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return "--";
+        }
+        return integerNumber.format(value);
+    }
+
     $effect(() => {
         const pageGlobal = $page.data?.global as
             | GlobalMarketSummary
@@ -165,17 +186,13 @@
         <section class="market-floating-bar" aria-label="Pinned market stats">
             <div class="market-floating-stats" aria-label="Live market stats">
                 <span class="market-floating-item"
-                    >Coins: {integerNumber.format(
-                        global.activeCryptocurrencies,
-                    )}</span
+                    >Coins: {formatInteger(global.activeCryptocurrencies)}</span
                 >
                 <span class="market-floating-item"
-                    >Exchanges: {integerNumber.format(
-                        global.totalExchanges,
-                    )}</span
+                    >Exchanges: {formatInteger(global.totalExchanges)}</span
                 >
                 <span class="market-floating-item"
-                    >Market Cap: {compactUsd.format(global.totalMarketCapUsd)}
+                    >Market Cap: {formatCompactUsd(global.totalMarketCapUsd)}
                     <span
                         class={global.marketCapChangePercentage24hUsd >= 0
                             ? "positive"
@@ -186,13 +203,13 @@
                     ></span
                 >
                 <span class="market-floating-item"
-                    >24h Vol: {compactUsd.format(global.totalVolumeUsd)}</span
+                    >24h Vol: {formatCompactUsd(global.totalVolumeUsd)}</span
                 >
                 <span class="market-floating-item"
-                    >Dominance: BTC {global.btcDominance.toFixed(1)}%</span
+                    >Dominance: BTC {formatOneDecimalPercent(global.btcDominance)}%</span
                 >
                 <span class="market-floating-item"
-                    >ETH {global.ethDominance.toFixed(1)}%</span
+                    >ETH {formatOneDecimalPercent(global.ethDominance)}%</span
                 >
                 <span class="market-floating-item"
                     >Gas: {formatGasGwei(global.gasGwei)} GWEI</span

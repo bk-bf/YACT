@@ -38,19 +38,57 @@ interface MarketsResponse {
     error?: string;
 }
 
-export async function loadMarketsPageData(fetchFn: typeof fetch) {
-    const response = await fetchFn('/api/markets');
-    const payload = (await response.json()) as MarketsResponse;
+const EMPTY_GLOBAL: GlobalMarketSummary = {
+    totalMarketCapUsd: 0,
+    totalVolumeUsd: 0,
+    marketCapChangePercentage24hUsd: 0,
+    btcDominance: 0,
+    ethDominance: 0,
+    totalExchanges: 0,
+    activeCryptocurrencies: 0,
+    gasGwei: null,
+    marketCapSparkline7d: []
+};
 
+const EMPTY_HIGHLIGHTS: MarketHighlights = {
+    trending: [],
+    topGainers: []
+};
+
+function normalizeMarketsPayload(payload: Partial<MarketsResponse> | null) {
+    const safePayload = payload ?? {};
     return {
-        coins: payload.coins,
-        global: payload.global,
-        headlines: payload.headlines,
-        highlights: payload.highlights,
-        source: payload.source,
-        snapshotTs: payload.snapshotTs ?? null,
-        stale: payload.stale ?? false,
-        warning: payload.warning ?? null,
-        error: payload.error ?? null
+        coins: Array.isArray(safePayload.coins) ? safePayload.coins : [],
+        global: safePayload.global ?? EMPTY_GLOBAL,
+        headlines: Array.isArray(safePayload.headlines) ? safePayload.headlines : [],
+        highlights: safePayload.highlights ?? EMPTY_HIGHLIGHTS,
+        source: safePayload.source ?? 'analytics-api',
+        snapshotTs: safePayload.snapshotTs ?? null,
+        stale: safePayload.stale ?? false,
+        warning: safePayload.warning ?? null,
+        error: safePayload.error ?? null
     };
+}
+
+export async function loadMarketsPageData(fetchFn: typeof fetch) {
+    try {
+        const response = await fetchFn('/api/markets');
+        const payload = (await response.json()) as Partial<MarketsResponse>;
+
+        if (!response.ok) {
+            return normalizeMarketsPayload({
+                ...payload,
+                stale: true,
+                warning: payload.warning ?? 'Live market data is temporarily unavailable. Showing safe defaults.'
+            });
+        }
+
+        return normalizeMarketsPayload(payload);
+    } catch {
+        return normalizeMarketsPayload({
+            stale: true,
+            warning: 'Live market data is temporarily unavailable. Showing safe defaults.',
+            error: null
+        });
+    }
 }
