@@ -2,15 +2,15 @@
     import { browser } from "$app/environment";
     import CoinTerminalChart from "../../components/CoinTerminalChart.svelte";
     import {
-        loadCoinDetailAuxData,
         loadCoinDetailCriticalOnlyData,
+        loadCoinDetailHeadlinesData,
+        loadCoinDetailMarketsAuxData,
     } from "./coin-detail-page.data";
     import { useProgressiveDataLoad } from "../../composables/useProgressiveDataLoad.svelte";
 
     let { data } = $props();
-    const { viewData, loadCritical, loadAuxiliary } = useProgressiveDataLoad(
-        () => data,
-    );
+    const progressive = useProgressiveDataLoad(() => data);
+    const viewData = $derived(progressive.getViewData());
 
     const usd = new Intl.NumberFormat("en-US", {
         style: "currency",
@@ -54,31 +54,52 @@
         minute: "2-digit",
     });
 
-    const refreshCoinData = async () => {
-        // Load critical data (coin + chart) first
-        await loadCritical(() =>
-            loadCoinDetailCriticalOnlyData(fetch, coin.id),
-        );
+    let isRefreshingCoinData = $state(false);
+    let lastInitialRefreshCoinId = $state<string | null>(null);
 
-        // Then load auxiliary data (headlines, markets, etc.) in background with smart merging
-        await loadAuxiliary(async (current) => {
-            const aux = await loadCoinDetailAuxData(fetch);
-            return {
-                ...current,
-                headlines:
-                    aux.headlines.length > 0
-                        ? aux.headlines
-                        : current.headlines,
-                trending:
-                    aux.trending.length > 0 ? aux.trending : current.trending,
-                topGainers:
-                    aux.topGainers.length > 0
-                        ? aux.topGainers
-                        : current.topGainers,
-                marketsSnapshotTs:
-                    aux.marketsSnapshotTs ?? current.marketsSnapshotTs,
-            };
-        });
+    const refreshCoinData = async () => {
+        if (isRefreshingCoinData) {
+            return;
+        }
+
+        isRefreshingCoinData = true;
+
+        // Load critical data (coin + chart) first
+        try {
+            await progressive.loadCritical(() =>
+                loadCoinDetailCriticalOnlyData(fetch, coin.id),
+            );
+
+            // Then load auxiliary data (headlines, markets, etc.) in background with smart merging
+            await progressive.loadAuxiliary(async (current) => {
+                const headlines = await loadCoinDetailHeadlinesData(fetch);
+                return {
+                    ...current,
+                    headlines:
+                        headlines.length > 0 ? headlines : current.headlines,
+                };
+            });
+
+            // Keep markets-derived side panels non-blocking and independent from headline loading.
+            void progressive.loadAuxiliary(async (current) => {
+                const aux = await loadCoinDetailMarketsAuxData(fetch);
+                return {
+                    ...current,
+                    trending:
+                        aux.trending.length > 0
+                            ? aux.trending
+                            : current.trending,
+                    topGainers:
+                        aux.topGainers.length > 0
+                            ? aux.topGainers
+                            : current.topGainers,
+                    marketsSnapshotTs:
+                        aux.marketsSnapshotTs ?? current.marketsSnapshotTs,
+                };
+            });
+        } finally {
+            isRefreshingCoinData = false;
+        }
     };
 
     function formatOptionalDate(value: string | null): string {
@@ -515,6 +536,11 @@
             return;
         }
 
+        if (lastInitialRefreshCoinId === data.coin.id) {
+            return;
+        }
+
+        lastInitialRefreshCoinId = data.coin.id;
         void refreshCoinData();
     });
 

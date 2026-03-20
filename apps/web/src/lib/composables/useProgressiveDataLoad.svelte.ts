@@ -13,13 +13,14 @@
  */
 
 interface ProgressiveLoadState<T> {
-    viewData: T;
+    getViewData: () => T;
+    getLiveData: () => T | null;
     loadCritical: (loadFn: () => Promise<T>) => Promise<void>;
     loadAuxiliary: (mergeFn: (current: T) => Promise<T>) => Promise<void>;
-    isLoading: boolean;
+    getIsLoading: () => boolean;
 }
 
-export function useProgressiveDataLoad<T>(getInitialData: () => T): ProgressiveLoadState<T> & { liveData: T | null } {
+export function useProgressiveDataLoad<T>(getInitialData: () => T): ProgressiveLoadState<T> {
     let liveData = $state<T | null>(null);
     let isLoading = $state(false);
     let requestId = 0;
@@ -63,9 +64,9 @@ export function useProgressiveDataLoad<T>(getInitialData: () => T): ProgressiveL
     };
 
     return {
-        liveData,
-        viewData,
-        isLoading,
+        getLiveData: () => liveData,
+        getViewData: () => viewData,
+        getIsLoading: () => isLoading,
         loadCritical,
         loadAuxiliary,
     };

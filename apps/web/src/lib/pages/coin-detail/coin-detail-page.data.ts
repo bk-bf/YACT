@@ -271,35 +271,57 @@ function delay(ms: number): Promise<void> {
 }
 
 export async function loadCoinDetailAuxData(fetchFn: typeof fetch) {
+    const [headlines, markets] = await Promise.all([
+        loadCoinDetailHeadlinesData(fetchFn),
+        loadCoinDetailMarketsAuxData(fetchFn),
+    ]);
+
+    return {
+        ok:
+            headlines.length > 0 ||
+            markets.trending.length > 0 ||
+            markets.topGainers.length > 0,
+        marketsSnapshotTs: markets.marketsSnapshotTs,
+        headlines,
+        trending: markets.trending,
+        topGainers: markets.topGainers,
+    };
+}
+
+export async function loadCoinDetailHeadlinesData(fetchFn: typeof fetch): Promise<CryptoHeadline[]> {
+    const headlinesCacheTtlMs = 30_000;
+    const headlinesResult = await fetchJsonWithTimeout<HeadlinesResponse>(
+        fetchFn,
+        '/api/headlines',
+        2500,
+        headlinesCacheTtlMs,
+    );
+
+    if (!headlinesResult.ok || !headlinesResult.data) {
+        return [];
+    }
+
+    return headlinesResult.data.headlines ?? [];
+}
+
+export async function loadCoinDetailMarketsAuxData(fetchFn: typeof fetch) {
     const timeoutsMs = [2500, 4000, 6000];
     const marketsCacheTtlMs = 20_000;
-    const headlinesCacheTtlMs = 30_000;
 
     for (let i = 0; i < timeoutsMs.length; i += 1) {
-        const [marketsResult, headlinesResult] = await Promise.all([
-            fetchJsonWithTimeout<MarketsAuxResponse>(
-                fetchFn,
-                '/api/markets',
-                timeoutsMs[i],
-                marketsCacheTtlMs,
-            ),
-            fetchJsonWithTimeout<HeadlinesResponse>(
-                fetchFn,
-                '/api/headlines',
-                2500,
-                headlinesCacheTtlMs,
-            ),
-        ]);
+        const marketsResult = await fetchJsonWithTimeout<MarketsAuxResponse>(
+            fetchFn,
+            '/api/markets',
+            timeoutsMs[i],
+            marketsCacheTtlMs,
+        );
 
-        if ((marketsResult.ok && marketsResult.data) || (headlinesResult.ok && headlinesResult.data)) {
+        if (marketsResult.ok && marketsResult.data) {
             const aux = marketsResult.data;
-            const headlinesData = headlinesResult.data;
             return {
-                ok: true,
-                marketsSnapshotTs: aux?.snapshotTs ?? aux?.ts ?? null,
-                headlines: headlinesData?.headlines ?? [],
-                trending: aux?.highlights?.trending ?? [],
-                topGainers: aux?.highlights?.topGainers ?? [],
+                marketsSnapshotTs: aux.snapshotTs ?? aux.ts ?? null,
+                trending: aux.highlights?.trending ?? [],
+                topGainers: aux.highlights?.topGainers ?? [],
             };
         }
 
@@ -309,9 +331,7 @@ export async function loadCoinDetailAuxData(fetchFn: typeof fetch) {
     }
 
     return {
-        ok: false,
         marketsSnapshotTs: null,
-        headlines: [],
         trending: [],
         topGainers: [],
     };

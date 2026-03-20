@@ -6,7 +6,8 @@
     import { loadWatchlistPageData } from "../../lib/pages/watchlist/watchlist-page.data";
 
     let { data } = $props();
-    const { viewData, loadCritical } = useProgressiveDataLoad(() => data);
+    const progressive = useProgressiveDataLoad(() => data);
+    const viewData = $derived(progressive.getViewData());
 
     const usd = new Intl.NumberFormat("en-US", {
         style: "currency",
@@ -47,7 +48,7 @@
             return;
         }
 
-        void loadCritical(() => loadWatchlistPageData(fetch));
+        void progressive.loadCritical(() => loadWatchlistPageData(fetch));
     });
 </script>
 
