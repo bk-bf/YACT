@@ -206,7 +206,9 @@
                     >24h Vol: {formatCompactUsd(global.totalVolumeUsd)}</span
                 >
                 <span class="market-floating-item"
-                    >Dominance: BTC {formatOneDecimalPercent(global.btcDominance)}%</span
+                    >Dominance: BTC {formatOneDecimalPercent(
+                        global.btcDominance,
+                    )}%</span
                 >
                 <span class="market-floating-item"
                     >ETH {formatOneDecimalPercent(global.ethDominance)}%</span
