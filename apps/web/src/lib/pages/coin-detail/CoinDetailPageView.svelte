@@ -427,7 +427,7 @@
                     rel="noreferrer"
                     class="coin-inline-link"
                 >
-                    See historical data
+                    See historical data <span aria-hidden="true">↗</span>
                 </a>
             </article>
 

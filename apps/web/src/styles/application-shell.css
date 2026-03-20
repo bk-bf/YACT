@@ -952,9 +952,13 @@ a {
 
 .coin-inline-link {
     color: var(--color-inline-link);
-    font-weight: 700;
+    font-weight: 600;
+    font-size: 0.82rem;
     text-decoration: none;
     width: fit-content;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
 }
 
 .coin-inline-link:hover {
