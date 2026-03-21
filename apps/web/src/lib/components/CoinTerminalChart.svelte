@@ -196,7 +196,10 @@
         // one candle per data point rather than forcing a minimum chunk size of 2
         // (which would throw away half the data and produce wide, wick-less blobs).
         const effectiveBuckets = Math.max(1, Math.min(buckets, values.length));
-        const chunkSize = Math.max(1, Math.floor(values.length / effectiveBuckets));
+        const chunkSize = Math.max(
+            1,
+            Math.floor(values.length / effectiveBuckets),
+        );
 
         for (let i = 0; i < values.length; i += chunkSize) {
             const chunk = values.slice(
