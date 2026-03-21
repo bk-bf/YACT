@@ -1,4 +1,4 @@
-interface CoinBreakdown {
+export interface CoinBreakdown {
     id: string;
     apiId: string;
     symbol: string;
@@ -42,7 +42,7 @@ interface CoinBreakdownResponse {
     error?: string;
 }
 
-interface CryptoHeadline {
+export interface CryptoHeadline {
     id: string;
     title: string;
     url: string;
@@ -50,7 +50,7 @@ interface CryptoHeadline {
     publishedAt: string;
 }
 
-interface HighlightCoin {
+export interface HighlightCoin {
     id: string;
     symbol: string;
     name: string;
