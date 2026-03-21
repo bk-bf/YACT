@@ -323,7 +323,9 @@
             <p class="market-overview-subtitle">
                 The global crypto market cap today is
                 <span
-                    class={`market-overview-pill ${jitter.getFlash("globalMarketCap") === "up" ? "price-tick-up" : jitter.getFlash("globalMarketCap") === "down" ? "price-tick-down" : ""}`}
+                    class={`market-overview-pill ${jitter.getFlash("globalMarketCap") === "up" ? "price-tick-up" : jitter.getFlash("globalMarketCap") === "down" ? "price-tick-down" : ""} ${hover.isActive("pill") ? "hover-glow-active" : ""}`}
+                    onmouseenter={() => hover.enter("pill")}
+                    onmouseleave={() => hover.leave()}
                 >
                     <strong class="market-overview-pill-value"
                         >{formatJitterUsd(
@@ -420,7 +422,7 @@
             <header>
                 <h3>🔥 Trending</h3>
                 <!-- TODO(T-007, see .docs/features/open/ROADMAP.md): Wire this placeholder button to a full Trending list view. -->
-                <button type="button" class="inline-link">View more</button>
+                <button type="button" class="inline-link">View more ›</button>
             </header>
             <ul>
                 {#each viewData.highlights.trending as coin}
@@ -442,7 +444,13 @@
                         </div>
                         <div class="overview-coin-right">
                             <span
-                                class={`overview-coin-value ${jitter.getFlash(coin.id) === "up" ? "price-tick-up" : jitter.getFlash(coin.id) === "down" ? "price-tick-down" : ""}`}
+                                class={[
+                                    "overview-coin-value",
+                                    jitter.getFlash(coin.id) === "up" ? "price-tick-up" : jitter.getFlash(coin.id) === "down" ? "price-tick-down" : "",
+                                    hover.isActive(`t-price-${coin.id}`) ? "hover-glow-active" : "",
+                                ].filter(Boolean).join(" ")}
+                                onmouseenter={() => hover.enter(`t-price-${coin.id}`)}
+                                onmouseleave={() => hover.leave()}
                             >
                                 {isCoinJitterEligible(coin)
                                     ? formatJitterUsd(
@@ -452,9 +460,13 @@
                                     : fullUsd.format(coin.currentPrice)}
                             </span>
                             <span
-                                class={coin.priceChangePercentage24h >= 0
-                                    ? "positive overview-coin-change"
-                                    : "negative overview-coin-change"}
+                                class={[
+                                    coin.priceChangePercentage24h >= 0 ? "positive" : "negative",
+                                    "overview-coin-change",
+                                    hover.isActive(`t-chg-${coin.id}`) ? (coin.priceChangePercentage24h >= 0 ? "hover-glow-positive" : "hover-glow-negative") : "",
+                                ].filter(Boolean).join(" ")}
+                                onmouseenter={() => hover.enter(`t-chg-${coin.id}`)}
+                                onmouseleave={() => hover.leave()}
                             >
                                 {signedPercent.format(
                                     coin.priceChangePercentage24h / 100,
@@ -470,7 +482,7 @@
             <header>
                 <h3>� Top Gainers</h3>
                 <!-- TODO(T-007, see .docs/features/open/ROADMAP.md): Wire this placeholder button to a full Top Gainers list view. -->
-                <button type="button" class="inline-link">View more</button>
+                <button type="button" class="inline-link">View more ›</button>
             </header>
             <ul>
                 {#each viewData.highlights.topGainers as coin}
