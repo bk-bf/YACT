@@ -68,6 +68,25 @@
     let sharedHeadlines = $state<CryptoHeadline[]>([]);
     let activeNavigationKey = $state<string | null>(null);
 
+    const pageGlobalForShell = $derived(
+        ($page.data?.global as GlobalMarketSummary | undefined) ?? null,
+    );
+    const effectiveGlobal = $derived(
+        sharedGlobal ??
+            (pageGlobalForShell && hasMeaningfulGlobal(pageGlobalForShell)
+                ? pageGlobalForShell
+                : null),
+    );
+
+    function hasMeaningfulGlobal(global: GlobalMarketSummary): boolean {
+        return (
+            global.totalMarketCapUsd > 0 ||
+            global.totalVolumeUsd > 0 ||
+            global.activeCryptocurrencies > 0 ||
+            global.totalExchanges > 0
+        );
+    }
+
     function formatHeadlineDate(value: string): string {
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) {
@@ -133,7 +152,7 @@
         const pageGlobal = $page.data?.global as
             | GlobalMarketSummary
             | undefined;
-        if (pageGlobal) {
+        if (pageGlobal && hasMeaningfulGlobal(pageGlobal)) {
             sharedGlobal = pageGlobal;
         }
 
@@ -163,7 +182,11 @@
                 if (marketsResponse.ok) {
                     const payload =
                         (await marketsResponse.json()) as MarketsLayoutPayload;
-                    if (!cancelled && payload.global) {
+                    if (
+                        !cancelled &&
+                        payload.global &&
+                        hasMeaningfulGlobal(payload.global)
+                    ) {
                         sharedGlobal = payload.global;
                     }
 
@@ -312,9 +335,7 @@
         <span class="route-progress-bar"></span>
     </div>
 
-    {#if sharedGlobal ?? ($page.data?.global as GlobalMarketSummary | undefined)}
-        {@const global =
-            sharedGlobal ?? ($page.data?.global as GlobalMarketSummary)}
+    {#if effectiveGlobal}
         {@const topbarHeadlines = (
             sharedHeadlines.length > 0
                 ? sharedHeadlines
@@ -323,35 +344,47 @@
         <section class="market-floating-bar" aria-label="Pinned market stats">
             <div class="market-floating-stats" aria-label="Live market stats">
                 <span class="market-floating-item"
-                    >Coins: {formatInteger(global.activeCryptocurrencies)}</span
+                    >Coins: {formatInteger(
+                        effectiveGlobal.activeCryptocurrencies,
+                    )}</span
                 >
                 <span class="market-floating-item"
-                    >Exchanges: {formatInteger(global.totalExchanges)}</span
+                    >Exchanges: {formatInteger(
+                        effectiveGlobal.totalExchanges,
+                    )}</span
                 >
                 <span class="market-floating-item"
-                    >Market Cap: {formatCompactUsd(global.totalMarketCapUsd)}
+                    >Market Cap: {formatCompactUsd(
+                        effectiveGlobal.totalMarketCapUsd,
+                    )}
                     <span
-                        class={global.marketCapChangePercentage24hUsd >= 0
+                        class={effectiveGlobal.marketCapChangePercentage24hUsd >=
+                        0
                             ? "positive"
                             : "negative"}
                         >{signedPercent.format(
-                            global.marketCapChangePercentage24hUsd / 100,
+                            effectiveGlobal.marketCapChangePercentage24hUsd /
+                                100,
                         )}</span
                     ></span
                 >
                 <span class="market-floating-item"
-                    >24h Vol: {formatCompactUsd(global.totalVolumeUsd)}</span
+                    >24h Vol: {formatCompactUsd(
+                        effectiveGlobal.totalVolumeUsd,
+                    )}</span
                 >
                 <span class="market-floating-item"
                     >Dominance: BTC {formatOneDecimalPercent(
-                        global.btcDominance,
+                        effectiveGlobal.btcDominance,
                     )}%</span
                 >
                 <span class="market-floating-item"
-                    >ETH {formatOneDecimalPercent(global.ethDominance)}%</span
+                    >ETH {formatOneDecimalPercent(
+                        effectiveGlobal.ethDominance,
+                    )}%</span
                 >
                 <span class="market-floating-item"
-                    >Gas: {formatGasGwei(global.gasGwei)} GWEI</span
+                    >Gas: {formatGasGwei(effectiveGlobal.gasGwei)} GWEI</span
                 >
             </div>
 
