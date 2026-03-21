@@ -74,9 +74,9 @@ export function nudgeValue(value: number, scale: JitterScale = 'coin'): number {
         return Math.max(0, value + Math.round((Math.random() * 2 - 1) * 700_000));
     }
     if (value >= 10_000) return Math.max(0.01, value + Math.round((Math.random() * 2 - 1) * 18));
-    if (value >= 1_000)  return Math.max(0.01, value + Math.round((Math.random() * 2 - 1) * 4));
-    if (value >= 100)    return Math.max(0.01, Math.round((value + (Math.random() * 2 - 1) * 0.9) * 100) / 100);
-    if (value >= 10)     return Math.max(0.01, Math.round((value + (Math.random() * 2 - 1) * 0.12) * 100) / 100);
+    if (value >= 1_000) return Math.max(0.01, value + Math.round((Math.random() * 2 - 1) * 4));
+    if (value >= 100) return Math.max(0.01, Math.round((value + (Math.random() * 2 - 1) * 0.9) * 100) / 100);
+    if (value >= 10) return Math.max(0.01, Math.round((value + (Math.random() * 2 - 1) * 0.12) * 100) / 100);
     return Math.max(0.001, Math.round((value + (Math.random() * 2 - 1) * 0.015) * 1000) / 1000);
 }
 
@@ -90,7 +90,7 @@ export function nudgeValue(value: number, scale: JitterScale = 'coin'): number {
  */
 export function createPriceJitter() {
     let _values = $state<Record<string, number>>({});
-    let _flash   = $state<Record<string, 'up' | 'down' | ''>>({});
+    let _flash = $state<Record<string, 'up' | 'down' | ''>>({});
 
     function tick(
         id: string,
@@ -101,10 +101,10 @@ export function createPriceJitter() {
         setTimeout(() => {
             if (cancelRef.cancelled) return;
             const current = _values[id] ?? baseValue;
-            const next    = nudgeValue(current, scale);
+            const next = nudgeValue(current, scale);
             const dir: 'up' | 'down' = next >= current ? 'up' : 'down';
             _values[id] = next;
-            _flash[id]  = dir;
+            _flash[id] = dir;
             setTimeout(() => { if (!cancelRef.cancelled) _flash[id] = ''; }, 480);
             tick(id, next, scale, cancelRef);
         }, 4_000 + Math.random() * 9_500);
@@ -127,7 +127,7 @@ export function createPriceJitter() {
         /** Reactive map of jitter-adjusted values, keyed by entry id. */
         get values(): Record<string, number> { return _values; },
         /** Reactive map of flash direction ('up' | 'down' | ''), keyed by id. */
-        get flash(): Record<string, 'up' | 'down' | ''>  { return _flash; },
+        get flash(): Record<string, 'up' | 'down' | ''> { return _flash; },
         /** Begin jittering the given entries. Returns a stop/cleanup function. */
         start,
         /** Current jitter-adjusted value or `fallback` if not yet ticked. */

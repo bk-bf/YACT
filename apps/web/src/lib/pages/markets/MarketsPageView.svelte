@@ -1,6 +1,9 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import { createPriceJitter, isCoinJitterEligible } from "../../effects/usePriceJitter.svelte";
+    import {
+        createPriceJitter,
+        isCoinJitterEligible,
+    } from "../../effects/usePriceJitter.svelte";
     import M3Button from "../../components/M3Button.svelte";
     import {
         coerceMarketsPageData,
@@ -348,7 +351,12 @@
                     : jitter.getFlash("globalMarketCap") === "down"
                       ? "price-tick-down"
                       : ""}
-            >{formatJitterUsd("globalMarketCap", viewData.global.totalMarketCapUsd)}</h3>
+            >
+                {formatJitterUsd(
+                    "globalMarketCap",
+                    viewData.global.totalMarketCapUsd,
+                )}
+            </h3>
             <p>
                 Market Cap
                 <span
@@ -384,7 +392,12 @@
                     : jitter.getFlash("globalVolume") === "down"
                       ? "price-tick-down"
                       : ""}
-            >{formatJitterUsd("globalVolume", viewData.global.totalVolumeUsd)}</h3>
+            >
+                {formatJitterUsd(
+                    "globalVolume",
+                    viewData.global.totalVolumeUsd,
+                )}
+            </h3>
             <p>24h Trading Volume</p>
             <p class="muted">
                 BTC Dominance: {formatTwoDecimals(
@@ -427,7 +440,10 @@
                                 class={`overview-coin-value ${jitter.getFlash(coin.id) === "up" ? "price-tick-up" : jitter.getFlash(coin.id) === "down" ? "price-tick-down" : ""}`}
                             >
                                 {isCoinJitterEligible(coin)
-                                    ? formatJitterUsd(coin.id, coin.currentPrice)
+                                    ? formatJitterUsd(
+                                          coin.id,
+                                          coin.currentPrice,
+                                      )
                                     : fullUsd.format(coin.currentPrice)}
                             </span>
                             <span
@@ -435,7 +451,9 @@
                                     ? "positive overview-coin-change"
                                     : "negative overview-coin-change"}
                             >
-                                {signedPercent.format(coin.priceChangePercentage24h / 100)}
+                                {signedPercent.format(
+                                    coin.priceChangePercentage24h / 100,
+                                )}
                             </span>
                         </div>
                     </li>
@@ -586,7 +604,10 @@
                                       : ""}
                             >
                                 {isCoinJitterEligible(coin)
-                                    ? formatJitterUsd(coin.id, coin.currentPrice)
+                                    ? formatJitterUsd(
+                                          coin.id,
+                                          coin.currentPrice,
+                                      )
                                     : usd.format(coin.currentPrice)}
                             </td>
                             <td

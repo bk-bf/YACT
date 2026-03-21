@@ -104,7 +104,11 @@
     const tickerDuration = $derived(
         topbarHeadlines.length === 0
             ? 30
-            : Math.max(20, topbarHeadlines.reduce((acc, h) => acc + h.title.length, 0) / 8),
+            : Math.max(
+                  20,
+                  topbarHeadlines.reduce((acc, h) => acc + h.title.length, 0) /
+                      8,
+              ),
     );
 
     function hasMeaningfulGlobal(global: GlobalMarketSummary): boolean {
@@ -443,17 +447,24 @@
                                 class="news-ticker-item"
                                 href={headline.url}
                                 target="_blank"
-                                rel="noreferrer"
-                            >{headline.title}</a>
-                            <span class="news-ticker-sep" aria-hidden="true">◆</span>
+                                rel="noreferrer">{headline.title}</a
+                            >
+                            <span class="news-ticker-sep" aria-hidden="true"
+                                >◆</span
+                            >
                         {/each}
                     </div>
                 </div>
             </div>
         {:else}
-            <div class="news-pill-wrap news-pill-empty" aria-label="No news available">
+            <div
+                class="news-pill-wrap news-pill-empty"
+                aria-label="No news available"
+            >
                 <span class="news-pill-label">📰 News</span>
-                <span class="news-ticker-placeholder">No headlines right now</span>
+                <span class="news-ticker-placeholder"
+                    >No headlines right now</span
+                >
             </div>
         {/if}
     </section>
