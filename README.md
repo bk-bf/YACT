@@ -27,4 +27,26 @@ Backend services moved to the standalone `yact-server` repo. This web repo consu
 - `make lint`: run web and schema checks
 - `make test`: run web and schema tests
 - `scripts/check.sh`: run lint/test checks in one command
+- `scripts/capture-web-incident.sh [base_url] [coin_id]`: capture a timestamped incident bundle under `/tmp/yact-web-incident-*`
+
+## Active Known Issue (2026-03-21)
+
+- Markets route (`/`) may still show transient flicker during hydration or coin->home navigation:
+  - compact-value style oscillation (`$2.5T` then `$2.50T`)
+  - temporary zero/empty regression before recovery
+- Track status and investigation details in `BUGS.md` and `.docs/bugs/BUGS.md` (BUG-002).
+
+## Debugging Workflow (Required)
+
+To avoid repeated architecture churn during incident response:
+
+1. Capture one timestamped evidence bundle before patching:
+	- preferred: `./scripts/capture-web-incident.sh`
+	- or manual probes for `/api/markets`, `/api/debug/snapshot-meta`, `/api/headlines`, `/api/debug/client-logs?limit=300`
+2. Document state ownership map for affected UI region:
+	- route loader state
+	- page-local mutation paths
+	- layout polling assignments
+3. Apply the smallest fix that preserves one owner-of-truth for the impacted state.
+4. Re-run the same bundle and compare event order/values before marking fixed.
 

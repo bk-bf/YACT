@@ -2,6 +2,11 @@
     import M3Button from "../../components/M3Button.svelte";
     import { createEmptyMarketsPageData } from "./markets-page.data";
 
+    // Ownership contract (BUG-002):
+    // - This view renders route-owned payload only.
+    // - Structural fallback is allowed for safety, but this component must not
+    //   perform its own markets polling/refresh writes.
+    // - Shared layout polling can update shell surfaces, not page-owned state.
     const fallbackData = createEmptyMarketsPageData();
     let { data } = $props();
 

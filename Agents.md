@@ -28,29 +28,20 @@ Required workflow:
 2. Confirm dev server state and capture current terminal output.
 3. Capture browser-console relay tail via `/api/debug/client-logs`.
 4. Capture debug endpoints and web API proxy responses at the same timestamp.
-5. Correlate UI symptoms with relay logs and endpoint payloads.
-6. Classify incident: client-runtime, proxy-route, upstream-api, config/env, unknown.
-7. Apply fix and repeat the same capture to confirm resolution.
-8. After every code change, run curl probes to confirm non-500 responses from the active web URL (default `http://localhost:5173`) before reporting success.
+5. Document a state-ownership map for the affected UI (route loader vs page state vs layout polling).
+6. Correlate UI symptoms with relay logs, ownership map, and endpoint payloads.
+7. Classify incident: client-runtime, proxy-route, upstream-api, config/env, unknown.
+8. Apply the smallest fix and repeat the same capture to confirm resolution.
+9. After every code change, run curl probes to confirm non-500 responses from the active web URL (default `http://localhost:5173`) before reporting success.
+
+Workflow guardrail:
+- Do not switch loading architecture modes (for example, cache strategy plus SSR/client branching plus composable replacement) in the same incident without a before/after evidence bundle that proves the prior race/regression is removed.
 
 Use this minimal incident bundle command when investigating:
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-TS="$(date -u +%Y%m%dT%H%M%SZ)"
-OUT="/tmp/yact-web-incident-${TS}"
-mkdir -p "$OUT"
-
 cd /home/ubuntu/server/yact/yact-web
-
-curl -sS "http://127.0.0.1:5173/api/debug/client-logs?limit=300" > "$OUT/client-logs.json" || true
-curl -sS "http://127.0.0.1:5173/api/debug/snapshot-meta" > "$OUT/debug-snapshot-meta.json" || true
-curl -sS "http://127.0.0.1:5173/api/debug/auto-refresh" > "$OUT/debug-auto-refresh.json" || true
-curl -sS "http://127.0.0.1:5173/api/markets" > "$OUT/api-markets.json" || true
-
-echo "incident_bundle=$OUT"
+./scripts/capture-web-incident.sh
 ```
 
 ## .github routing
