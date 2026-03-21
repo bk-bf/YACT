@@ -529,7 +529,6 @@ a {
     justify-content: space-between;
     align-items: flex-start;
     gap: var(--space-4);
-    padding-bottom: var(--space-3);
 }
 
 .market-overview-head h1 {
@@ -584,7 +583,6 @@ a {
     gap: var(--space-3);
     grid-template-columns: repeat(4, minmax(0, 1fr));
     border-bottom: none;
-    padding-bottom: var(--space-3);
 }
 
 .overview-stat-card,
