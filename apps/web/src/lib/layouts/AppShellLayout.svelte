@@ -101,6 +101,12 @@
         ).slice(0, 5),
     );
 
+    const tickerDuration = $derived(
+        topbarHeadlines.length === 0
+            ? 30
+            : Math.max(20, topbarHeadlines.reduce((acc, h) => acc + h.title.length, 0) / 8),
+    );
+
     function hasMeaningfulGlobal(global: GlobalMarketSummary): boolean {
         return (
             global.totalMarketCapUsd > 0 ||
@@ -423,42 +429,33 @@
             >
         </div>
 
-        <details class="floating-headlines-dropdown">
-            <summary class="market-floating-item floating-headlines-pill">
-                Headlines
-            </summary>
-
-            <div
-                class="floating-headlines-panel"
-                aria-label="Top crypto headlines"
-            >
-                {#if topbarHeadlines.length === 0}
-                    <p class="floating-headlines-empty">
-                        No headlines available right now.
-                    </p>
-                {:else}
-                    <ul class="floating-headlines-list">
-                        {#each topbarHeadlines as headline}
-                            <li>
-                                <a
-                                    href={headline.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    class="floating-headline-link"
-                                >
-                                    {headline.title}
-                                </a>
-                                <span class="floating-headline-meta"
-                                    >{headline.source} • {formatHeadlineDate(
-                                        headline.publishedAt,
-                                    )}</span
-                                >
-                            </li>
+        {#if topbarHeadlines.length > 0}
+            <div class="news-pill-wrap" aria-label="Latest crypto headlines">
+                <span class="news-pill-label">📰 News</span>
+                <div class="news-ticker-overflow">
+                    <div
+                        class="news-ticker-inner"
+                        style="animation-duration: {tickerDuration}s"
+                        aria-live="off"
+                    >
+                        {#each [...topbarHeadlines, ...topbarHeadlines] as headline}
+                            <a
+                                class="news-ticker-item"
+                                href={headline.url}
+                                target="_blank"
+                                rel="noreferrer"
+                            >{headline.title}</a>
+                            <span class="news-ticker-sep" aria-hidden="true">◆</span>
                         {/each}
-                    </ul>
-                {/if}
+                    </div>
+                </div>
             </div>
-        </details>
+        {:else}
+            <div class="news-pill-wrap news-pill-empty" aria-label="No news available">
+                <span class="news-pill-label">📰 News</span>
+                <span class="news-ticker-placeholder">No headlines right now</span>
+            </div>
+        {/if}
     </section>
 
     <header class="terminal-header">
