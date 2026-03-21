@@ -55,7 +55,7 @@ const EMPTY_HIGHLIGHTS: MarketHighlights = {
     topGainers: []
 };
 
-type MarketsPageData = ReturnType<typeof normalizeMarketsPayload>;
+export type MarketsPageData = ReturnType<typeof normalizeMarketsPayload>;
 
 function normalizeMarketsPayload(payload: Partial<MarketsResponse> | null) {
     const safePayload = payload ?? {};
@@ -98,6 +98,12 @@ export function hasMeaningfulMarketsPayload(payload: ReturnType<typeof normalize
 
 export function createEmptyMarketsPageData(): MarketsPageData {
     return normalizeMarketsPayload(null);
+}
+
+export function coerceMarketsPageData(
+    payload: Partial<MarketsResponse> | null,
+): MarketsPageData {
+    return normalizeMarketsPayload(payload);
 }
 
 async function fetchMarketsPayload(

@@ -2,6 +2,7 @@
     import { browser } from "$app/environment";
     import M3Button from "../../components/M3Button.svelte";
     import {
+        coerceMarketsPageData,
         createEmptyMarketsPageData,
         hasMeaningfulMarketsPayload,
         loadMarketsPageData,
@@ -61,6 +62,28 @@
 
         return () => {
             cancelled = true;
+        };
+    });
+
+    $effect(() => {
+        if (!browser) {
+            return;
+        }
+
+        const onMarketsSync = (event: Event) => {
+            const customEvent = event as CustomEvent;
+            const next = coerceMarketsPageData(
+                (customEvent.detail as Record<string, unknown>) ?? null,
+            );
+
+            if (hasMeaningfulMarketsPayload(next)) {
+                recoveredData = next;
+            }
+        };
+
+        window.addEventListener("yact:markets-sync", onMarketsSync);
+        return () => {
+            window.removeEventListener("yact:markets-sync", onMarketsSync);
         };
     });
 

@@ -22,7 +22,17 @@
     }
 
     interface MarketsLayoutPayload {
+        coins?: Array<unknown>;
         global?: GlobalMarketSummary;
+        headlines?: CryptoHeadline[];
+        highlights?: {
+            trending?: Array<unknown>;
+            topGainers?: Array<unknown>;
+        };
+        snapshotTs?: number;
+        ts?: number;
+        stale?: boolean;
+        error?: string;
     }
 
     interface HeadlinesPayload {
@@ -155,6 +165,14 @@
                         (await marketsResponse.json()) as MarketsLayoutPayload;
                     if (!cancelled && payload.global) {
                         sharedGlobal = payload.global;
+                    }
+
+                    if (!cancelled) {
+                        window.dispatchEvent(
+                            new CustomEvent("yact:markets-sync", {
+                                detail: payload,
+                            }),
+                        );
                     }
                 }
             } catch {
