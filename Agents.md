@@ -52,4 +52,24 @@ cd /home/ubuntu/server/yact/yact-web
 ## Local scripts
 
 - `./scripts/dev-web.sh` — starts the Svelte web app dev server.
-- `./scripts/check.sh` — runs repository lint/test checks.
+- `./scripts/check.sh` — runs the full check pipeline: `svelte-check` → `knip` → `vitest`.
+
+## CI / check pipeline (`./scripts/check.sh`)
+
+The pipeline runs three stages in order:
+
+| Stage | Tool | What it checks |
+| --- | --- | --- |
+| `lint:web` | `svelte-check` | TypeScript types + Svelte-specific diagnostics across all `.svelte` and `.ts` source files. Fails on any error. |
+| `ci:knip` | `knip` | Unused exports, dead files, and undeclared/missing dependencies across the monorepo. Config lives in `knip.json` at the repo root. |
+| `test:web` | `vitest` | Unit tests matching `src/**/*.{test,spec}.{js,ts}`. Passes with no files when no tests are written yet (`--passWithNoTests`). |
+
+**Key files:**
+- `knip.json` — knip workspace config (root-level).
+- `apps/web/vite.config.ts` — imports from `vitest/config`; includes `test.environment: 'jsdom'`.
+- `apps/web/package.json` — `lint` runs `svelte-check`, `test` runs `vitest run --passWithNoTests`.
+- `apps/web/tsconfig.json` — includes `"node"` in `types` for `process.env` in server routes.
+
+**Adding tests:** drop `*.test.ts` or `*.spec.ts` files anywhere under `apps/web/src/`. Vitest picks them up automatically.
+
+**ESLint note:** ESLint is intentionally skipped — `svelte-check` covers Svelte-specific and TypeScript diagnostics, and the Svelte VS Code extension provides in-editor lint feedback. Add ESLint only if rule-based lint gates become necessary.

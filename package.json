@@ -1,17 +1,26 @@
 {
-  "name"      : "yact-monorepo",
-  "private"   : true,
-  "version"   : "0.1.0",
-  "workspaces": ["apps/web", "packages/shared-schemas"],
-  "scripts"   : {
-    "dev:web"     : "npm --workspace @yact/web run dev",
-    "build:web"   : "npm --workspace @yact/web run build",
-    "lint:web"    : "npm --workspace @yact/web run lint",
-    "test:web"    : "npm --workspace @yact/web run test",
+  "name": "yact-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web",
+    "packages/shared-schemas"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @yact/web run dev",
+    "build:web": "npm --workspace @yact/web run build",
+    "lint:web": "npm --workspace @yact/web run lint",
+    "test:web": "npm --workspace @yact/web run test",
     "lint:schemas": "npm --workspace @yact/shared-schemas run lint",
     "test:schemas": "npm --workspace @yact/shared-schemas run test",
-    "ci:lint"     : "npm run lint:web && npm run lint:schemas",
-    "ci:test"     : "npm run test:web && npm run test:schemas"
+    "ci:lint": "npm run lint:web && npm run lint:schemas",
+    "ci:test": "npm run test:web && npm run test:schemas",
+    "ci:knip": "knip"
   },
-  "engines"   : {"node": ">=20"}
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "knip": "^6.0.1"
+  }
 }

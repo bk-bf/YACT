@@ -1,0 +1,10 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    "apps/web": {},
+    "packages/shared-schemas": {
+      "entry": ["scripts/*.mjs"],
+      "project": ["scripts/*.mjs"]
+    }
+  }
+}

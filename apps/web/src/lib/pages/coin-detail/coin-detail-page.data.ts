@@ -256,7 +256,7 @@ function fallbackCoinNameForId(coinId: string): string {
         .join(' ');
 }
 
-export function createInitialCoinDetailPageData(coinId: string) {
+function createInitialCoinDetailPageData(coinId: string) {
     const fallbackCoinName = fallbackCoinNameForId(coinId);
     return {
         coin: normalizeCoinBreakdown(
@@ -280,24 +280,6 @@ export function createInitialCoinDetailPageData(coinId: string) {
 
 function delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export async function loadCoinDetailAuxData(fetchFn: typeof fetch) {
-    const [headlines, markets] = await Promise.all([
-        loadCoinDetailHeadlinesData(fetchFn),
-        loadCoinDetailMarketsAuxData(fetchFn),
-    ]);
-
-    return {
-        ok:
-            headlines.length > 0 ||
-            markets.trending.length > 0 ||
-            markets.topGainers.length > 0,
-        marketsSnapshotTs: markets.marketsSnapshotTs,
-        headlines,
-        trending: markets.trending,
-        topGainers: markets.topGainers,
-    };
 }
 
 export async function loadCoinDetailHeadlinesData(
@@ -360,67 +342,6 @@ export async function loadCoinDetailMarketsAuxData(
         marketsSnapshotTs: null,
         trending: [],
         topGainers: [],
-    };
-}
-
-export async function loadCoinDetailPageData(fetchFn: typeof fetch, coinId: string) {
-    const coinCacheTtlMs = 15_000;
-    const chartCacheTtlMs = 20_000;
-    const marketsCacheTtlMs = 20_000;
-    const headlinesCacheTtlMs = 30_000;
-    const marketsTimeoutMs = 6000;
-
-    const [coinResult, chartResult, marketsResult, headlinesResult] = await Promise.all([
-        fetchJsonWithTimeout<CoinBreakdownResponse>(fetchFn, `/api/coins/${coinId}`, 4000, coinCacheTtlMs),
-        fetchJsonWithTimeout<CoinChartResponse>(fetchFn, `/api/coins/${coinId}/chart?range=7d`, 3000, chartCacheTtlMs),
-        fetchJsonWithTimeout<MarketsAuxResponse>(fetchFn, '/api/markets', marketsTimeoutMs, marketsCacheTtlMs),
-        fetchJsonWithTimeout<HeadlinesResponse>(fetchFn, '/api/headlines', 2500, headlinesCacheTtlMs),
-    ]);
-
-    let chartPayload: CoinChartResponse | undefined;
-    if (chartResult.ok && chartResult.data) {
-        chartPayload = chartResult.data;
-    }
-
-    let headlines: CryptoHeadline[] = [];
-    let trending: HighlightCoin[] = [];
-    let topGainers: HighlightCoin[] = [];
-    let marketsSnapshotTs: number | null = null;
-    if (marketsResult.ok && marketsResult.data) {
-        const aux = marketsResult.data;
-        marketsSnapshotTs = aux.snapshotTs ?? aux.ts ?? null;
-        trending = aux.highlights?.trending ?? [];
-        topGainers = aux.highlights?.topGainers ?? [];
-    }
-
-    if (headlinesResult.ok && headlinesResult.data) {
-        headlines = headlinesResult.data.headlines ?? [];
-    }
-
-    const coinPayload = coinResult.ok ? coinResult.data : null;
-    const hasCoin = Boolean(coinPayload?.coin);
-    const fallbackCoinName = fallbackCoinNameForId(coinId);
-
-    return {
-        coin: normalizeCoinBreakdown(
-            hasCoin
-                ? coinPayload!.coin
-                : {
-                    id: coinId,
-                    apiId: coinId,
-                    symbol: coinId,
-                    name: fallbackCoinName || coinId,
-                    source: 'unavailable'
-                },
-            coinId,
-            chartPayload
-        ),
-        coinSnapshotTs: coinPayload?.snapshotTs ?? null,
-        stale: hasCoin ? (coinPayload?.stale ?? false) : true,
-        marketsSnapshotTs,
-        headlines,
-        trending,
-        topGainers
     };
 }
 

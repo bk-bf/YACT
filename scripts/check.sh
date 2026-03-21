@@ -7,4 +7,5 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 npm run ci:lint
+npm run ci:knip
 npm run ci:test
