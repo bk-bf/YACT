@@ -3,9 +3,21 @@ import { json } from '@sveltejs/kit';
 const ANALYTICS_BASE_URL = process.env.YACT_ANALYTICS_URL || 'http://localhost:8000';
 
 export async function GET({ fetch }) {
-    const response = await fetch(`${ANALYTICS_BASE_URL}/api/v1/headlines`, {
-        headers: { Accept: 'application/json' }
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+
+    let response: Response;
+    try {
+        response = await fetch(`${ANALYTICS_BASE_URL}/api/v1/headlines`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal
+        });
+    } catch {
+        clearTimeout(timer);
+        return json({ headlines: [], error: 'headlines upstream timed out', source: 'timeout', ts: Date.now(), count: 0 });
+    } finally {
+        clearTimeout(timer);
+    }
 
     if (!response.ok) {
         const detail = await response.text();

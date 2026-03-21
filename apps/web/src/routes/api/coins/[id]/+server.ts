@@ -9,9 +9,21 @@ export async function GET({ fetch, params }) {
         return json({ error: 'Missing coin id.' }, { status: 400 });
     }
 
-    const response = await fetch(`${ANALYTICS_BASE_URL}/api/v1/coins/${encodeURIComponent(coinId)}`, {
-        headers: { Accept: 'application/json' }
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 9000);
+
+    let response: Response;
+    try {
+        response = await fetch(`${ANALYTICS_BASE_URL}/api/v1/coins/${encodeURIComponent(coinId)}`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal
+        });
+    } catch {
+        clearTimeout(timer);
+        return json({ error: 'coin upstream timed out or unreachable' }, { status: 503 });
+    } finally {
+        clearTimeout(timer);
+    }
 
     if (!response.ok) {
         const detail = await response.text();

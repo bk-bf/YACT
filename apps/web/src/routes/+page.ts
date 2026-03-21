@@ -22,7 +22,7 @@ export const load: PageLoad = async ({ fetch }) => {
         }
     }
 
-    const data = await loadMarketsPageData(fetch, browser ? 2000 : 2200);
+    const data = await loadMarketsPageData(fetch, browser ? 4000 : 3000);
     setMarketsDataCache(data);
     return data;
 };

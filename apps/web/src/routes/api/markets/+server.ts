@@ -14,9 +14,21 @@ function getHighlights(coins: Array<{ priceChangePercentage24h: number; totalVol
 }
 
 export async function GET({ fetch }) {
-    const marketsResponse = await fetch(`${ANALYTICS_BASE_URL}/api/v1/markets`, {
-        headers: { Accept: 'application/json' }
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 9000);
+
+    let marketsResponse: Response;
+    try {
+        marketsResponse = await fetch(`${ANALYTICS_BASE_URL}/api/v1/markets`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal
+        });
+    } catch {
+        clearTimeout(timer);
+        return json({ error: 'markets upstream timed out or unreachable' }, { status: 503 });
+    } finally {
+        clearTimeout(timer);
+    }
 
     if (!marketsResponse.ok) {
         const detail = await marketsResponse.text();

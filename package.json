@@ -20,7 +20,10 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "vite": "^8.0.0"
+    }
   },
   "devDependencies": {
     "knip": "^6.0.1"
