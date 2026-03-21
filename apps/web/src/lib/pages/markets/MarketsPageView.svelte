@@ -9,7 +9,20 @@
 
     const fallbackData = createInitialMarketsPageData();
     let { data = fallbackData } = $props();
-    const progressive = useProgressiveDataLoad(() => data);
+    
+    // Safeguard: ensure data has required structure, falling back if any field is missing
+    const safeData = $derived(
+        data && 
+        data.coins &&
+        data.global &&
+        data.highlights &&
+        data.highlights.trending !== undefined &&
+        data.highlights.topGainers !== undefined
+            ? data
+            : fallbackData
+    );
+    
+    const progressive = useProgressiveDataLoad(() => safeData);
     const viewData = $derived(progressive.getViewData() ?? fallbackData);
 
     const usd = new Intl.NumberFormat("en-US", {
@@ -61,8 +74,34 @@
     const sparklineWidth = 140;
     const sparklineHeight = 42;
 
+    function hasMeaningfulMarketData(payload: typeof fallbackData): boolean {
+        return (
+            payload.coins.length > 0 ||
+            payload.global.totalMarketCapUsd > 0 ||
+            payload.highlights.trending.length > 0 ||
+            payload.highlights.topGainers.length > 0
+        );
+    }
+
+    function isEmptyStalePayload(payload: typeof fallbackData): boolean {
+        return payload.stale && !hasMeaningfulMarketData(payload);
+    }
+
     async function refreshMarketsData(): Promise<void> {
-        await progressive.loadCritical(() => loadMarketsPageData(fetch));
+        await progressive.loadCritical(async () => {
+            const next = await loadMarketsPageData(fetch);
+            const current = progressive.getViewData() ?? fallbackData;
+
+            const nextIsEmptyStale = isEmptyStalePayload(next);
+            const shouldPreserve = nextIsEmptyStale && hasMeaningfulMarketData(current);
+
+            if (shouldPreserve) {
+                console.info("[markets-refresh] preserving current state (stale response)");
+                return current;
+            }
+
+            return next;
+        });
     }
 
     function sparklinePath(

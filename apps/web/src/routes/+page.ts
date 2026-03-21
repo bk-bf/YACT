@@ -1,17 +1,10 @@
 import type { PageLoad } from './$types';
-import { browser } from '$app/environment';
 
-import {
-    createInitialMarketsPageData,
-    loadMarketsPageDataWithTimeout,
-} from '../lib/pages/markets/markets-page.data';
+import { loadMarketsPageDataWithTimeout } from '../lib/pages/markets/markets-page.data';
 
 export const load: PageLoad = async ({ fetch }) => {
-    // Keep client-side route transitions instant; background refresh runs in view.
-    if (browser) {
-        return createInitialMarketsPageData();
-    }
-
-    // On hard reload/server render, allow a modest fetch window to avoid empty first paint.
-    return loadMarketsPageDataWithTimeout(fetch, 1200);
+    // Single unified fetch path for both SSR and client navigation.
+    // SvelteKit's request deduplication handles concurrent requests automatically.
+    // Timeout is set generous (3500ms) to accommodate /api/markets endpoint latency (~1s).
+    return loadMarketsPageDataWithTimeout(fetch, 3500);
 };
