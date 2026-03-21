@@ -3,22 +3,24 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev:web"     : "pnpm --filter @yact/web run dev",
-    "build:web"   : "pnpm --filter @yact/web run build",
-    "lint:web"    : "pnpm --filter @yact/web run lint",
-    "test:web"    : "pnpm --filter @yact/web run test",
+    "dev:web": "pnpm --filter @yact/web run dev",
+    "build:web": "pnpm --filter @yact/web run build",
+    "lint:web": "pnpm --filter @yact/web run lint",
+    "test:web": "pnpm --filter @yact/web run test",
     "lint:schemas": "pnpm --filter @yact/shared-schemas run lint",
     "test:schemas": "pnpm --filter @yact/shared-schemas run test",
-    "ci:lint"     : "pnpm run lint:web && pnpm run lint:schemas",
-    "ci:test"     : "pnpm run test:web && pnpm run test:schemas",
-    "ci:knip"     : "knip"
+    "ci:lint": "pnpm run lint:web && pnpm run lint:schemas",
+    "ci:test": "pnpm run test:web && pnpm run test:schemas",
+    "ci:knip": "knip"
   },
   "engines": {
     "node": ">=20",
     "pnpm": ">=10"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "knip": "^6.0.1"
