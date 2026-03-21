@@ -2,6 +2,8 @@
 
 Cycle-aware crypto tracker and analysis workspace focused on lens-driven interpretation rather than raw metric display.
 
+[frontpage_image](image.png)
+
 ## What it does
 
 YACT defines a product and documentation baseline for an AI-assisted crypto analysis platform.
