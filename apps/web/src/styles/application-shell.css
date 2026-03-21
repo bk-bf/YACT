@@ -366,9 +366,9 @@ a {
 
 .market-tab.active {
     color: var(--color-brand-text);
-    background: transparent;
-    box-shadow: none;
-    text-shadow: 0 0 8px rgba(179, 85, 255, 0.28);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
 }
 
 .route-links {
@@ -388,9 +388,9 @@ a {
 
 .route-link[aria-current='page'] {
     color: var(--color-accent-text);
-    background: transparent;
-    box-shadow: none;
-    text-shadow: 0 0 8px rgba(179, 85, 255, 0.28);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
 }
 
 .m3-surface {
@@ -1063,9 +1063,9 @@ a {
 
 .coin-terminal-tab.active {
     color: var(--color-accent-text);
-    background: transparent;
-    box-shadow: none;
-    text-shadow: 0 0 8px rgba(179, 85, 255, 0.28);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 7px;
 }
 
 .coin-terminal-layout {
