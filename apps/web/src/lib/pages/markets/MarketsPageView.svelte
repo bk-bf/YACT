@@ -1,11 +1,16 @@
 <script lang="ts">
     import { browser } from "$app/environment";
+    import { getContext } from "svelte";
     import {
         createPriceJitter,
         isCoinJitterEligible,
     } from "../../effects/usePriceJitter.svelte";
     import { createHoverGlow } from "../../effects/useHoverGlow.svelte";
     import { useMarketsDataRecovery } from "../../composables/useMarketsDataRecovery.svelte";
+    import {
+        VIEW_SETTINGS_KEY,
+        type ViewSettings,
+    } from "../../composables/useViewSettings.svelte";
     import MarketOverviewPanel from "./MarketOverviewPanel.svelte";
     import MarketFilterBar from "./MarketFilterBar.svelte";
     import CoinTableRow from "./CoinTableRow.svelte";
@@ -14,6 +19,8 @@
         hasMeaningfulMarketsPayload,
         type MarketsPageData,
     } from "./markets-page.data";
+
+    const settings = getContext<ViewSettings>(VIEW_SETTINGS_KEY);
 
     // Ownership contract (BUG-002):
     // - This view renders route-owned payload only.
@@ -51,6 +58,21 @@
     const jitter = createPriceJitter();
     const hover = createHoverGlow();
 
+    // Progressive row rendering: render the first 20 rows immediately (above
+    // the fold) then expand to all rows over two animation frames. This lets
+    // the browser paint the visible table as soon as data arrives rather than
+    // blocking on all 100 rows. renderedCount resets on component mount, so
+    // each fresh navigation re-batches from the top.
+    let renderedCount = $state(20);
+    $effect(() => {
+        const total = viewData.coins.length;
+        if (total === 0 || renderedCount >= total) return;
+        const raf = requestAnimationFrame(() => {
+            renderedCount = Math.min(renderedCount + 40, total);
+        });
+        return () => cancelAnimationFrame(raf);
+    });
+
     $effect(() => {
         if (!browser) return;
 
@@ -73,46 +95,19 @@
 
         return jitter.start([...coinEntries, ...macroEntries]);
     });
-
-    type OverviewStyleVariant = "separate" | "unified" | "minimal";
-
-    const overviewStyleOptions: Array<{
-        value: OverviewStyleVariant;
-        label: string;
-    }> = [
-        { value: "separate", label: "Separate Bubbles" },
-        { value: "unified", label: "One Bubble" },
-        { value: "minimal", label: "Flat Black" },
-    ];
-
-    let overviewStyle = $state<OverviewStyleVariant>("separate");
 </script>
 
 <svelte:head>
     <title>YACT Top 100 Markets</title>
 </svelte:head>
 
-<div
-    class="market-overview-style-switcher"
-    role="toolbar"
-    aria-label="Overview style variants"
->
-    {#each overviewStyleOptions as option}
-        <button
-            type="button"
-            class:active={overviewStyle === option.value}
-            class="table-filter-item market-overview-style-toggle"
-            aria-pressed={overviewStyle === option.value}
-            onclick={() => {
-                overviewStyle = option.value;
-            }}
-        >
-            {option.label}
-        </button>
-    {/each}
-</div>
-
-<MarketOverviewPanel {viewData} {jitter} {hover} {overviewStyle} />
+<MarketOverviewPanel
+    {viewData}
+    {jitter}
+    {hover}
+    overviewStyle={settings.overviewStyle}
+    showPill={settings.showMarketCapPill}
+/>
 
 <section class="market-section">
     <h2 class="m3-surface-title">Top 100 Cryptocurrencies By Market Cap</h2>
@@ -136,7 +131,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {#each viewData.coins as coin}
+                    {#each viewData.coins.slice(0, renderedCount) as coin}
                         <CoinTableRow {coin} {jitter} />
                     {/each}
                 </tbody>

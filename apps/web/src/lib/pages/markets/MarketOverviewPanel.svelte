@@ -24,6 +24,7 @@
         jitter,
         hover,
         overviewStyle,
+        showPill = true,
     }: {
         viewData: MarketsPageData;
         jitter: {
@@ -36,6 +37,7 @@
             leave: () => void;
         };
         overviewStyle: OverviewStyleVariant;
+        showPill?: boolean;
     } = $props();
 
     function formatJitterUsd(key: string, base: number): string {
@@ -59,7 +61,11 @@
             <p class="market-overview-subtitle">
                 The global crypto market cap today is
                 <span
-                    class={`market-overview-pill ${jitter.getFlash("globalMarketCap") === "up" ? "price-tick-up" : jitter.getFlash("globalMarketCap") === "down" ? "price-tick-down" : ""} ${hover.isActive("pill") ? "hover-glow-active" : ""}`}
+                    class={[
+                        showPill ? "market-overview-pill" : "",
+                        jitter.getFlash("globalMarketCap") === "up" ? "price-tick-up" : jitter.getFlash("globalMarketCap") === "down" ? "price-tick-down" : "",
+                        hover.isActive("pill") ? "hover-glow-active" : "",
+                    ].filter(Boolean).join(" ") || undefined}
                     onmouseenter={() => hover.enter("pill")}
                     onmouseleave={() => hover.leave()}
                 >
@@ -70,14 +76,12 @@
                         )}</strong
                     >
                     <span
-                        class={viewData.global
-                            .marketCapChangePercentage24hUsd >= 0
+                        class={viewData.global.marketCapChangePercentage24hUsd >= 0
                             ? "positive market-overview-pill-change"
                             : "negative market-overview-pill-change"}
                     >
                         {signedPercent.format(
-                            viewData.global.marketCapChangePercentage24hUsd /
-                                100,
+                            viewData.global.marketCapChangePercentage24hUsd / 100,
                         )}
                     </span>
                 </span>

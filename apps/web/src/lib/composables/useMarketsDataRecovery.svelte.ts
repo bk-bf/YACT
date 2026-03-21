@@ -38,8 +38,13 @@ export function useMarketsDataRecovery(
         let cancelled = false;
 
         void (async () => {
+            // Exponential backoff: each retry waits longer before hitting the
+            // server again, reducing congestion when the server is under load.
+            // Timeout per attempt is longer than +page.ts to let aborted
+            // requests clear from the server before retrying.
+            const delays = [2000, 5000];
             for (let attempt = 0; attempt < 3; attempt += 1) {
-                const next = await loadMarketsPageData(fetch, 5000);
+                const next = await loadMarketsPageData(fetch, 12000);
                 if (cancelled) return;
 
                 if (hasMeaningfulMarketsPayload(next)) {
@@ -54,7 +59,9 @@ export function useMarketsDataRecovery(
                 }
 
                 if (attempt < 2) {
-                    await new Promise((resolve) => setTimeout(resolve, 350));
+                    await new Promise((resolve) =>
+                        setTimeout(resolve, delays[attempt]),
+                    );
                 }
             }
         })();
