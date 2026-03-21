@@ -3,8 +3,12 @@
   "workspaces": {
     "apps/web": {},
     "packages/shared-schemas": {
-      "entry": ["scripts/*.mjs"],
-      "project": ["scripts/*.mjs"]
+      "entry": [
+        "scripts/*.mjs"
+      ],
+      "project": [
+        "scripts/*.mjs"
+      ]
     }
   }
 }
