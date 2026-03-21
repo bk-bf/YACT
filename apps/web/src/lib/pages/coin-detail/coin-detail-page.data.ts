@@ -90,6 +90,7 @@ async function fetchJsonWithTimeout<T>(
     url: string,
     timeoutMs: number,
     cacheTtlMs = 0,
+    signal?: AbortSignal,
 ): Promise<FetchJsonResult<T>> {
     if (cacheTtlMs > 0) {
         const cached = requestCache.get(url);
@@ -102,6 +103,14 @@ async function fetchJsonWithTimeout<T>(
     }
 
     const controller = new AbortController();
+    const abortHandler = () => controller.abort();
+    if (signal) {
+        if (signal.aborted) {
+            controller.abort();
+        } else {
+            signal.addEventListener('abort', abortHandler, { once: true });
+        }
+    }
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const response = await fetchFn(url, { signal: controller.signal });
@@ -120,6 +129,9 @@ async function fetchJsonWithTimeout<T>(
         return { ok: false, status: 0, data: null };
     } finally {
         clearTimeout(timer);
+        if (signal) {
+            signal.removeEventListener('abort', abortHandler);
+        }
     }
 }
 
@@ -288,13 +300,17 @@ export async function loadCoinDetailAuxData(fetchFn: typeof fetch) {
     };
 }
 
-export async function loadCoinDetailHeadlinesData(fetchFn: typeof fetch): Promise<CryptoHeadline[]> {
+export async function loadCoinDetailHeadlinesData(
+    fetchFn: typeof fetch,
+    signal?: AbortSignal,
+): Promise<CryptoHeadline[]> {
     const headlinesCacheTtlMs = 30_000;
     const headlinesResult = await fetchJsonWithTimeout<HeadlinesResponse>(
         fetchFn,
         '/api/headlines',
         2500,
         headlinesCacheTtlMs,
+        signal,
     );
 
     if (!headlinesResult.ok || !headlinesResult.data) {
@@ -304,16 +320,26 @@ export async function loadCoinDetailHeadlinesData(fetchFn: typeof fetch): Promis
     return headlinesResult.data.headlines ?? [];
 }
 
-export async function loadCoinDetailMarketsAuxData(fetchFn: typeof fetch) {
-    const timeoutsMs = [2500, 4000, 6000];
+export async function loadCoinDetailMarketsAuxData(
+    fetchFn: typeof fetch,
+    signal?: AbortSignal,
+) {
+    // Keep aux markets fetch lightweight so route transitions are not blocked
+    // by overlapping long retries from coin-detail side panels.
+    const timeoutsMs = [1800, 2600];
     const marketsCacheTtlMs = 20_000;
 
     for (let i = 0; i < timeoutsMs.length; i += 1) {
+        if (signal?.aborted) {
+            break;
+        }
+
         const marketsResult = await fetchJsonWithTimeout<MarketsAuxResponse>(
             fetchFn,
             '/api/markets',
             timeoutsMs[i],
             marketsCacheTtlMs,
+            signal,
         );
 
         if (marketsResult.ok && marketsResult.data) {
@@ -422,14 +448,30 @@ export async function loadCoinDetailCriticalData(fetchFn: typeof fetch, coinId: 
     };
 }
 
-export async function loadCoinDetailCriticalOnlyData(fetchFn: typeof fetch, coinId: string) {
+export async function loadCoinDetailCriticalOnlyData(
+    fetchFn: typeof fetch,
+    coinId: string,
+    signal?: AbortSignal,
+) {
     const initialData = createInitialCoinDetailPageData(coinId);
     const coinCacheTtlMs = 15_000;
     const chartCacheTtlMs = 20_000;
 
     const [coinResult, chartResult] = await Promise.all([
-        fetchJsonWithTimeout<CoinBreakdownResponse>(fetchFn, `/api/coins/${coinId}`, 3000, coinCacheTtlMs),
-        fetchJsonWithTimeout<CoinChartResponse>(fetchFn, `/api/coins/${coinId}/chart?range=7d`, 2500, chartCacheTtlMs),
+        fetchJsonWithTimeout<CoinBreakdownResponse>(
+            fetchFn,
+            `/api/coins/${coinId}`,
+            3000,
+            coinCacheTtlMs,
+            signal,
+        ),
+        fetchJsonWithTimeout<CoinChartResponse>(
+            fetchFn,
+            `/api/coins/${coinId}/chart?range=7d`,
+            2500,
+            chartCacheTtlMs,
+            signal,
+        ),
     ]);
 
     if (!coinResult.ok || !coinResult.data?.coin) {

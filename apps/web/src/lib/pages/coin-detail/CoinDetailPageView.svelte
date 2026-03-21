@@ -1,5 +1,6 @@
 <script lang="ts">
     import { browser } from "$app/environment";
+    import { navigating } from "$app/stores";
     import CoinTerminalChart from "../../components/CoinTerminalChart.svelte";
     import {
         loadCoinDetailCriticalOnlyData,
@@ -56,21 +57,41 @@
 
     let isRefreshingCoinData = $state(false);
     let lastInitialRefreshCoinId = $state<string | null>(null);
+    let isCoinDetailViewActive = $state(true);
+    let refreshAbortController = $state<AbortController | null>(null);
 
     const refreshCoinData = async () => {
         if (isRefreshingCoinData) {
             return;
         }
 
-        isRefreshingCoinData = true;
+        refreshAbortController?.abort();
+        const abortController = new AbortController();
+        refreshAbortController = abortController;
 
-        const headlinesPromise = loadCoinDetailHeadlinesData(fetch);
-        const marketsPromise = loadCoinDetailMarketsAuxData(fetch);
+        isRefreshingCoinData = true;
 
         // Load critical data (coin + chart) first
         try {
             await progressive.loadCritical(() =>
-                loadCoinDetailCriticalOnlyData(fetch, coin.id),
+                loadCoinDetailCriticalOnlyData(
+                    fetch,
+                    coin.id,
+                    abortController.signal,
+                ),
+            );
+
+            if (!isCoinDetailViewActive) {
+                return;
+            }
+
+            const headlinesPromise = loadCoinDetailHeadlinesData(
+                fetch,
+                abortController.signal,
+            );
+            const marketsPromise = loadCoinDetailMarketsAuxData(
+                fetch,
+                abortController.signal,
             );
 
             // Then load auxiliary data (headlines, markets, etc.) in background with smart merging
@@ -102,8 +123,31 @@
             });
         } finally {
             isRefreshingCoinData = false;
+            if (refreshAbortController === abortController) {
+                refreshAbortController = null;
+            }
         }
     };
+
+    $effect(() => {
+        isCoinDetailViewActive = true;
+        return () => {
+            isCoinDetailViewActive = false;
+            refreshAbortController?.abort();
+        };
+    });
+
+    $effect(() => {
+        const destinationPath = $navigating?.to?.url?.pathname;
+        if (!destinationPath) {
+            return;
+        }
+
+        if (!destinationPath.startsWith("/currencies/")) {
+            isCoinDetailViewActive = false;
+            refreshAbortController?.abort();
+        }
+    });
 
     function formatOptionalDate(value: string | null): string {
         if (!value) return "--";
