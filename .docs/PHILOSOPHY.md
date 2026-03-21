@@ -1,4 +1,4 @@
-<!-- LOC cap: 82 (source: 410, ratio: 0.20, updated: 2026-03-21) -->
+<!-- LOC cap: 470 (source: 4702, ratio: 0.10, updated: 2026-03-21) -->
 # PHILOSOPHY
 
 ## Product Thesis

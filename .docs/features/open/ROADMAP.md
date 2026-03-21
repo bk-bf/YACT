@@ -1,4 +1,4 @@
-<!-- LOC cap: 678 (source: 6778, ratio: 0.10, updated: 2026-03-21) -->
+<!-- LOC cap: 470 (source: 4702, ratio: 0.10, updated: 2026-03-21) -->
 # ROADMAP
 
 ## Open
@@ -12,7 +12,8 @@ TODO mapping rule for placeholder code:
 ### Phase 1 - Core Navigation + Coin Breakdown First (Week 1)
 
 - [ ] **T-018**: Resolve BUG-002 zero-state regression in hydration/logo navigation windows
-  - Deliverables: monotonic state write rules across shell and page, instrumentation showing assignment provenance around `/api/debug/client-logs`, and validated no-regression behavior for `/currencies/[id] -> /` and `/ -> /` logo clicks
+  - Deliverables: monotonic state write rules across shell and page, SWR cache for `/api/markets` on home page, `RouteProgress.svelte` loading bar, instrumentation showing assignment provenance around `/api/debug/client-logs`, and validated no-regression behavior for `/currencies/[id] -> /` and `/ -> /` logo clicks
+  - **Progress (2026-03-21)**: module-level SWR cache in `markets-page.data.ts` implemented; `hasMeaningfulGlobal` monotonic guard in `AppShellLayout.svelte` implemented; `RouteProgress.svelte` extracted and mounted universally; zero-state on hard reload confirmed fixed. `/currencies/[id] -> /` zero-state still reported as occurring intermittently.
   - Manual verification: run incident capture and reproduce both navigation paths 5x without sticky headbar or summary cards dropping to zero
   - Exit criteria: no transient zero-state in repeated repro cycles and BUG-002 can move to closed with evidence bundle
 

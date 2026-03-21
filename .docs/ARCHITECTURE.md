@@ -1,4 +1,4 @@
-<!-- LOC cap: 678 (source: 6778, ratio: 0.10, updated: 2026-03-21) -->
+<!-- LOC cap: 470 (source: 4702, ratio: 0.10, updated: 2026-03-21) -->
 # ARCHITECTURE
 
 ## System Overview
@@ -79,11 +79,17 @@ Coin detail flow:
 
 This progressive rendering approach ensures the coin price, name, and chart appear within ~50-100ms, while heavier auxiliary data (markets, headlines) fetches without blocking initial render.
 
-TTL cache policy (web loader layer):
-- `/api/coins/{id}`: 15s
-- `/api/coins/{id}/chart?range=7d`: 20s
-- `/api/markets`: 20s
-- `/api/headlines`: 30s
+Cache policy (web loader layer):
+- `/api/coins/{id}`: 15s TTL (coin-detail context)
+- `/api/coins/{id}/chart?range=7d`: 20s TTL (coin-detail context)
+- `/api/markets` in coin-detail context: 20s TTL
+- `/api/headlines` in coin-detail context: 30s TTL
+- `/api/markets` on markets home page: module-level stale-while-revalidate with meaningful-data guard — no time expiry; cached result is returned instantly on SvelteKit navigation and revalidated in the background; cache expires only when the page module is unloaded (hard reload).
+
+## Loading Indicator
+
+`RouteProgress.svelte` is the shared top-of-page loading bar (purple, 3px).
+It activates during SvelteKit route transitions (`$navigating`) and also shows briefly on initial page load/hard reload via a 500ms `$effect` timer. It is mounted once in `AppShellLayout.svelte`.
 
 ## Client Diagnostics
 

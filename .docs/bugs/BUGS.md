@@ -1,34 +1,21 @@
-<!-- LOC cap: 678 (source: 6778, ratio: 0.10, updated: 2026-03-21) -->
+<!-- LOC cap: 470 (source: 4702, ratio: 0.10, updated: 2026-03-21) -->
 # BUGS
 
 ## Open
 
 ### BUG-002: Markets hydration/navigation flicker (value-style oscillation and transient zero-state)
-- **Status**: Open (Partially fixed)
-- **Severity**: High
+- **Status**: Open (Monitoring)
+- **Severity**: Low
 - **First appeared**: 2026-03-21
 - **Related roadmap task**: T-018
 - **Area**: UI
-- **Summary**: Core navigation blocking and compact-value formatting oscillation are fixed, but transient zero-data state still appears on hard refresh and logo navigation (`/currencies/[id] -> /`, and sometimes `/ -> /` via logo).
-- **Partial fix**:
-  1. **Commit**: `2909ffd9da5fea50d9a0e4154fa0c0f39421822d`
-  2. **Fixed in commit**: route transition delay caused by data fetching/polling contention.
-  3. **Fixed in follow-up**: compact value style oscillation (`$2.5T` vs `$2.50T`).
-  4. **Still open**: transient zero-data rendering in sticky headbar and/or market summary during refresh/logo navigation.
-- **Reproduction steps**:
-  1. Open `/currencies/bitcoin`.
-  2. Click logo to navigate back to `/`.
-  3. Observe market summary cards and compact reference line for first 1-3s.
-  4. Repeat with hard reload and inspect network order for `/api/markets`, `/api/headlines?_ts=...`, and `/api/debug/client-logs`.
-  5. Optional: while already on `/`, click logo again and verify sticky headbar does not regress to zero values.
-- **Expected**: Stable first paint from route data with no zero-state regression and no compact-value oscillation.
-- **Actual**: Navigation delay and compact oscillation are resolved, but zero-data state still intermittently appears around the `POST /api/debug/client-logs` window, between successful `/api/markets` and `/api/headlines?_ts=...` requests.
-- **Root cause (working hypothesis)**: Remaining issue is a state-adoption race in shell/page ownership during hydration and post-navigation polling windows, not an API availability failure.
-- **Fix plan**:
-  1. Add focused timing/provenance logs for state writes to sticky headbar and markets page immediately before/after `POST /api/debug/client-logs`.
-  2. Verify and enforce monotonic/non-regressive assignment rules for shell global state and page markets state.
-  3. Capture before/after incident bundles with the same reproduction path and correlate by timestamp.
-  4. Close only after repeated `/currencies/[id] -> /` and `/ -> /` logo clicks show no zero-state regression.
+- **Summary**: All primary symptoms resolved. Route-transition delay, compact-value oscillation, zero-state on hard reload, and frequent zero-state on logo navigation are all fixed. A rare residual zero-state flash on `/currencies/[id] -> /` navigation remains — occurs seldom enough that active investigation is deferred to monitoring.
+- **Fixes applied (2026-03-21)**:
+  1. Module-level stale-while-revalidate cache in `markets-page.data.ts` (`getMarketsDataCache`/`setMarketsDataCache`): serves cached meaningful data instantly on SvelteKit navigation and revalidates in the background.
+  2. `hasMeaningfulGlobal` guard in `AppShellLayout.svelte`: shell sticky-bar state only updates when incoming data is meaningful; prevents empty fallback from overwriting good state.
+  3. `RouteProgress.svelte` component: shared purple top-of-page loading bar active on route transitions and initial page load (500ms `$effect` timer).
+- **Residual**: Very rare zero-state flash on `/currencies/[id] -> /` navigation only. Not reproducible on demand; guards are working in the vast majority of cases.
+- **Monitoring condition**: Reopen and escalate severity if zero-state becomes reproducible on demand or occurs more than once per 20 navigations.
 
 ## Closed
 

@@ -1,4 +1,4 @@
-<!-- LOC cap: 678 (source: 6778, ratio: 0.10, updated: 2026-03-21) -->
+<!-- LOC cap: 470 (source: 4702, ratio: 0.10, updated: 2026-03-21) -->
 # DECISIONS
 
 ## ADR-001: Bootstrap Monorepo With Separate Web and Analytics Runtimes
@@ -121,14 +121,14 @@ Adopt a pattern where route loads return safe initial shells, then client-side r
 Coin detail first paint was rendering placeholder values (`0`, `--`, and empty rail modules) while all data waited for client refresh. Measured page-load latency showed `/api/markets` variance and payload size were the dominant contributors to delayed right-rail population.
 
 ### Decision
-Adopt a phased hybrid strategy for coin detail:
+Adopt a phased hybrid strategy:
 - Phase 1: SSR-load critical coin fields (`/api/coins/{id}` and chart) for first render while preserving non-blocking client navigation behavior.
-- Phase 2: add in-memory TTL caching in web data loaders for hot endpoints (`/api/coins/{id}`, `/api/coins/{id}/chart`, `/api/markets`, `/api/headlines`) to reduce repeated fetch costs during short navigation windows.
-- Phase 3: defer route-level stale-while-revalidate for `/api/markets` as a follow-up if p95 latency still degrades UX.
+- Phase 2: add in-memory TTL caching in `coin-detail-page.data.ts` for hot endpoints within coin-detail context (`/api/coins/{id}`: 15s, `/api/coins/{id}/chart`: 20s, `/api/markets`: 20s, `/api/headlines`: 30s).
+- Phase 3 (implemented): add module-level stale-while-revalidate cache for `/api/markets` on the markets home page (`markets-page.data.ts`). This cache uses a `hasMeaningfulMarketsPayload` guard instead of a time-based TTL — meaningful cached data is served instantly on SvelteKit navigations and revalidated in the background.
 
 ### Consequences
-- Pros: materially better perceived first paint for coin core metrics, fewer repeated heavy fetches, less right-rail empty-state dwell time.
-- Cons: short staleness window introduced by TTL cache, more nuanced server-vs-browser route behavior.
+- Pros: materially better perceived first paint for coin core metrics, fewer repeated heavy fetches, zero-state flash eliminated on SPA navigation to `/`.
+- Cons: short staleness window for coin-detail TTL; markets page cache persists until hard reload (module unload).
 
 ## ADR-008: Enforce Single Owner Of Route-Critical View State During Hydration
 
@@ -166,3 +166,20 @@ Client navigation latency and zero-state regressions were amplified by overlappi
 ### Consequences
 - Pros: route transitions remain fast under load, fewer stale in-flight writes after route exit, improved recovery from aborted first markets fetch.
 - Cons: additional state-ownership complexity between shell and page recovery paths, requiring stronger instrumentation and incident correlation.
+
+## ADR-010: Adopt pnpm Workspaces and Structured Check Pipeline
+
+**Date**: 2026-03-21  
+**Status**: Accepted
+
+### Context
+The monorepo was using npm with ad-hoc local tooling. Reliable dead-code detection, consistent type checking, and test coverage gating were missing from the developer workflow.
+
+### Decision
+- Migrate to pnpm (workspace-aware, faster installs, strict dependency isolation).
+- Wire `svelte-check` (type + Svelte diagnostics), `knip` (dead-code/unused-exports), and `vitest` (unit tests) as pipeline stages in `scripts/check.sh`.
+- Configuration: `knip.json` at repo root; `pnpm-workspace.yaml` for workspace resolution.
+
+### Consequences
+- Pros: consistent three-stage check gate (`lint:web` → `ci:knip` → `test:web`), faster installs with pnpm, dead code caught at review time, Svelte-specific diagnostics via `svelte-check`.
+- Cons: pnpm required for local installs; contributors must use `pnpm install` not `npm install`.
