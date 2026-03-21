@@ -29,7 +29,7 @@ export function createHoverGlow() {
         /** Returns true if the given id is currently hovered. */
         isActive(id: string): boolean { return _active === id; },
         /** Call on mouseenter with any stable id string. */
-        enter(id: string): void  { _active = id; },
+        enter(id: string): void { _active = id; },
         /** Call on mouseleave. */
         leave(_id?: string): void { _active = null; },
     };

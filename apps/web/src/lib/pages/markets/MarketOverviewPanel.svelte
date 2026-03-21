@@ -19,8 +19,15 @@
         displayCoinName,
     }: {
         viewData: MarketsPageData;
-        jitter: { getFlash: (k: string) => string | null; getValue: (k: string, b: number) => number };
-        hover: { isActive: (id: string) => boolean; enter: (id: string) => void; leave: () => void };
+        jitter: {
+            getFlash: (k: string) => string | null;
+            getValue: (k: string, b: number) => number;
+        };
+        hover: {
+            isActive: (id: string) => boolean;
+            enter: (id: string) => void;
+            leave: () => void;
+        };
         formatJitterUsd: (key: string, base: number) => string;
         formatStableCompactUsd: (v: number | null | undefined) => string;
         formatTwoDecimals: (v: number | null | undefined) => string;
@@ -53,12 +60,14 @@
                         )}</strong
                     >
                     <span
-                        class={viewData.global.marketCapChangePercentage24hUsd >= 0
+                        class={viewData.global
+                            .marketCapChangePercentage24hUsd >= 0
                             ? "positive market-overview-pill-change"
                             : "negative market-overview-pill-change"}
                     >
                         {signedPercent.format(
-                            viewData.global.marketCapChangePercentage24hUsd / 100,
+                            viewData.global.marketCapChangePercentage24hUsd /
+                                100,
                         )}
                     </span>
                 </span>
@@ -76,7 +85,10 @@
                       ? "price-tick-down"
                       : ""}
             >
-                {formatJitterUsd("globalMarketCap", viewData.global.totalMarketCapUsd)}
+                {formatJitterUsd(
+                    "globalMarketCap",
+                    viewData.global.totalMarketCapUsd,
+                )}
             </h3>
             <p>
                 Market Cap
@@ -91,7 +103,9 @@
                 </span>
             </p>
             <p class="muted">
-                Reference compact value: {formatStableCompactUsd(viewData.global.totalMarketCapUsd)}
+                Reference compact value: {formatStableCompactUsd(
+                    viewData.global.totalMarketCapUsd,
+                )}
             </p>
             <svg
                 class={`sparkline sparkline-market ${marketCapDirectionClass()}`}
@@ -112,14 +126,21 @@
                       ? "price-tick-down"
                       : ""}
             >
-                {formatJitterUsd("globalVolume", viewData.global.totalVolumeUsd)}
+                {formatJitterUsd(
+                    "globalVolume",
+                    viewData.global.totalVolumeUsd,
+                )}
             </h3>
             <p>24h Trading Volume</p>
             <p class="muted">
-                BTC Dominance: {formatTwoDecimals(viewData.global.btcDominance)}%
+                BTC Dominance: {formatTwoDecimals(
+                    viewData.global.btcDominance,
+                )}%
             </p>
             <p class="muted">
-                Active Cryptocurrencies: {formatWhole(viewData.global.activeCryptocurrencies)}
+                Active Cryptocurrencies: {formatWhole(
+                    viewData.global.activeCryptocurrencies,
+                )}
             </p>
         </article>
 
@@ -151,26 +172,49 @@
                             <span
                                 class={[
                                     "overview-coin-value",
-                                    jitter.getFlash(coin.id) === "up" ? "price-tick-up" : jitter.getFlash(coin.id) === "down" ? "price-tick-down" : "",
-                                    hover.isActive(`t-price-${coin.id}`) ? "hover-glow-active" : "",
-                                ].filter(Boolean).join(" ")}
-                                onmouseenter={() => hover.enter(`t-price-${coin.id}`)}
+                                    jitter.getFlash(coin.id) === "up"
+                                        ? "price-tick-up"
+                                        : jitter.getFlash(coin.id) === "down"
+                                          ? "price-tick-down"
+                                          : "",
+                                    hover.isActive(`t-price-${coin.id}`)
+                                        ? "hover-glow-active"
+                                        : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                onmouseenter={() =>
+                                    hover.enter(`t-price-${coin.id}`)}
                                 onmouseleave={() => hover.leave()}
                             >
                                 {isCoinJitterEligible(coin)
-                                    ? formatJitterUsd(coin.id, coin.currentPrice)
+                                    ? formatJitterUsd(
+                                          coin.id,
+                                          coin.currentPrice,
+                                      )
                                     : fullUsd.format(coin.currentPrice)}
                             </span>
                             <span
                                 class={[
-                                    coin.priceChangePercentage24h >= 0 ? "positive" : "negative",
+                                    coin.priceChangePercentage24h >= 0
+                                        ? "positive"
+                                        : "negative",
                                     "overview-coin-change",
-                                    hover.isActive(`t-chg-${coin.id}`) ? (coin.priceChangePercentage24h >= 0 ? "hover-glow-positive" : "hover-glow-negative") : "",
-                                ].filter(Boolean).join(" ")}
-                                onmouseenter={() => hover.enter(`t-chg-${coin.id}`)}
+                                    hover.isActive(`t-chg-${coin.id}`)
+                                        ? coin.priceChangePercentage24h >= 0
+                                            ? "hover-glow-positive"
+                                            : "hover-glow-negative"
+                                        : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                onmouseenter={() =>
+                                    hover.enter(`t-chg-${coin.id}`)}
                                 onmouseleave={() => hover.leave()}
                             >
-                                {signedPercent.format(coin.priceChangePercentage24h / 100)}
+                                {signedPercent.format(
+                                    coin.priceChangePercentage24h / 100,
+                                )}
                             </span>
                         </div>
                     </li>
@@ -198,20 +242,32 @@
                             <div class="overview-coin-info">
                                 <span>{displayCoinName(coin.name)}</span>
                                 <span class="overview-coin-meta"
-                                    >{coin.symbol.toUpperCase()} · {fullUsd.format(coin.currentPrice)}</span
+                                    >{coin.symbol.toUpperCase()} · {fullUsd.format(
+                                        coin.currentPrice,
+                                    )}</span
                                 >
                             </div>
                         </div>
                         <span
                             class={[
                                 "overview-coin-value",
-                                coin.priceChangePercentage24h >= 0 ? "positive" : "negative",
-                                hover.isActive(`g-chg-${coin.id}`) ? (coin.priceChangePercentage24h >= 0 ? "hover-glow-positive" : "hover-glow-negative") : "",
-                            ].join(" ").trim()}
+                                coin.priceChangePercentage24h >= 0
+                                    ? "positive"
+                                    : "negative",
+                                hover.isActive(`g-chg-${coin.id}`)
+                                    ? coin.priceChangePercentage24h >= 0
+                                        ? "hover-glow-positive"
+                                        : "hover-glow-negative"
+                                    : "",
+                            ]
+                                .join(" ")
+                                .trim()}
                             onmouseenter={() => hover.enter(`g-chg-${coin.id}`)}
                             onmouseleave={() => hover.leave()}
                         >
-                            {signedPercent.format(coin.priceChangePercentage24h / 100)}
+                            {signedPercent.format(
+                                coin.priceChangePercentage24h / 100,
+                            )}
                         </span>
                     </li>
                 {/each}
