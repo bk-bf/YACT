@@ -4,6 +4,7 @@
     import { setContext } from "svelte";
     import RouteProgress from "../components/RouteProgress.svelte";
     import ViewSettingsMenu from "../components/ViewSettingsMenu.svelte";
+    import FloatingMarketItem from "./FloatingMarketItem.svelte";
     import { formatStableCompactUsd as formatCompactUsd } from "../utils/formatters";
     import {
         createViewSettings,
@@ -384,16 +385,11 @@
         aria-busy={!isGlobalReady}
     >
         <div class="market-floating-stats" aria-label="Live market stats">
-            <span class="market-floating-item"
-                >Coins: {formatInteger(
+            <FloatingMarketItem>Coins: {formatInteger(
                     displayGlobal.activeCryptocurrencies,
-                )}</span
-            >
-            <span class="market-floating-item"
-                >Exchanges: {formatInteger(displayGlobal.totalExchanges)}</span
-            >
-            <span class="market-floating-item"
-                >Market Cap: {formatCompactUsd(displayGlobal.totalMarketCapUsd)}
+                )}</FloatingMarketItem>
+            <FloatingMarketItem>Exchanges: {formatInteger(displayGlobal.totalExchanges)}</FloatingMarketItem>
+            <FloatingMarketItem>Market Cap: {formatCompactUsd(displayGlobal.totalMarketCapUsd)}
                 <span
                     class={displayGlobal.marketCapChangePercentage24hUsd >= 0
                         ? "positive"
@@ -401,24 +397,15 @@
                     >{formatSignedPct(
                         displayGlobal.marketCapChangePercentage24hUsd,
                     )}</span
-                ></span
-            >
-            <span class="market-floating-item"
-                >24h Vol: {formatCompactUsd(displayGlobal.totalVolumeUsd)}</span
-            >
-            <span class="market-floating-item"
-                >Dominance: BTC {formatOneDecimalPercent(
+                ></FloatingMarketItem>
+            <FloatingMarketItem>24h Vol: {formatCompactUsd(displayGlobal.totalVolumeUsd)}</FloatingMarketItem>
+            <FloatingMarketItem>Dominance: BTC {formatOneDecimalPercent(
                     displayGlobal.btcDominance,
-                )}%</span
-            >
-            <span class="market-floating-item"
-                >ETH {formatOneDecimalPercent(
+                )}%</FloatingMarketItem>
+            <FloatingMarketItem>ETH {formatOneDecimalPercent(
                     displayGlobal.ethDominance,
-                )}%</span
-            >
-            <span class="market-floating-item"
-                >Gas: {formatGasGwei(displayGlobal.gasGwei)} GWEI</span
-            >
+                )}%</FloatingMarketItem>
+            <FloatingMarketItem>Gas: {formatGasGwei(displayGlobal.gasGwei)} GWEI</FloatingMarketItem>
         </div>
 
         {#if topbarHeadlines.length > 0}

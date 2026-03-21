@@ -16,6 +16,9 @@
         SPARKLINE_WIDTH,
         SPARKLINE_HEIGHT,
     } from "../../utils/sparkline";
+    import OverviewListCard from "./OverviewListCard.svelte";
+    import CoinListRow from "./CoinListRow.svelte";
+    import StatCard from "./StatCard.svelte";
 
     type OverviewStyleVariant = "separate" | "unified" | "minimal";
 
@@ -99,7 +102,7 @@
     </div>
 
     <div class="overview-grid">
-        <article class="overview-stat-card">
+        <StatCard>
             <h3
                 class={jitter.getFlash("globalMarketCap") === "up"
                     ? "price-tick-up"
@@ -138,9 +141,9 @@
             >
                 <path d={sparklinePath(viewData.global.marketCapSparkline7d)} />
             </svg>
-        </article>
+        </StatCard>
 
-        <article class="overview-stat-card">
+        <StatCard>
             <h3
                 class={jitter.getFlash("globalVolume") === "up"
                     ? "price-tick-up"
@@ -164,32 +167,17 @@
                     viewData.global.activeCryptocurrencies,
                 )}
             </p>
-        </article>
+        </StatCard>
 
-        <article class="overview-list-card">
-            <header>
-                <h3>🔥 Trending</h3>
-                <!-- TODO(T-007, see .docs/features/open/ROADMAP.md): Wire this placeholder button to a full Trending list view. -->
-                <button type="button" class="inline-link">View more ›</button>
-            </header>
-            <ul>
-                {#each viewData.highlights.trending as coin}
-                    <li>
-                        <div class="overview-coin-row">
-                            <img
-                                class="overview-coin-logo"
-                                src={coin.image}
-                                alt={coin.name}
-                                width="24"
-                                height="24"
-                            />
-                            <div class="overview-coin-info">
-                                <span>{displayCoinName(coin.name)}</span>
-                                <span class="overview-coin-meta"
-                                    >{coin.symbol.toUpperCase()} · Rank #{coin.marketCapRank}</span
-                                >
-                            </div>
-                        </div>
+        <OverviewListCard title="🔥 Trending">
+            {#each viewData.highlights.trending as coin}
+                <CoinListRow
+                    image={coin.image}
+                    name={displayCoinName(coin.name)}
+                    symbol={coin.symbol.toUpperCase()}
+                    meta="Rank #{coin.marketCapRank}"
+                >
+                    {#snippet right()}
                         <div class="overview-coin-right">
                             <span
                                 class={[
@@ -239,37 +227,20 @@
                                 )}
                             </span>
                         </div>
-                    </li>
-                {/each}
-            </ul>
-        </article>
+                    {/snippet}
+                </CoinListRow>
+            {/each}
+        </OverviewListCard>
 
-        <article class="overview-list-card">
-            <header>
-                <h3>🚀 Top Gainers</h3>
-                <!-- TODO(T-007, see .docs/features/open/ROADMAP.md): Wire this placeholder button to a full Top Gainers list view. -->
-                <button type="button" class="inline-link">View more ›</button>
-            </header>
-            <ul>
-                {#each viewData.highlights.topGainers as coin}
-                    <li>
-                        <div class="overview-coin-row">
-                            <img
-                                class="overview-coin-logo"
-                                src={coin.image}
-                                alt={coin.name}
-                                width="24"
-                                height="24"
-                            />
-                            <div class="overview-coin-info">
-                                <span>{displayCoinName(coin.name)}</span>
-                                <span class="overview-coin-meta"
-                                    >{coin.symbol.toUpperCase()} · {fullUsd.format(
-                                        coin.currentPrice,
-                                    )}</span
-                                >
-                            </div>
-                        </div>
+        <OverviewListCard title="🚀 Top Gainers">
+            {#each viewData.highlights.topGainers as coin}
+                <CoinListRow
+                    image={coin.image}
+                    name={displayCoinName(coin.name)}
+                    symbol={coin.symbol.toUpperCase()}
+                    meta={fullUsd.format(coin.currentPrice)}
+                >
+                    {#snippet right()}
                         <span
                             class={[
                                 "overview-coin-value",
@@ -291,9 +262,9 @@
                                 coin.priceChangePercentage24h / 100,
                             )}
                         </span>
-                    </li>
-                {/each}
-            </ul>
-        </article>
+                    {/snippet}
+                </CoinListRow>
+            {/each}
+        </OverviewListCard>
     </div>
 </section>

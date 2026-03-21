@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { CoinBreakdown } from "./coin-detail-page.data";
+    import CoinRailCard from "./CoinRailCard.svelte";
 
     const { coin }: { coin: CoinBreakdown } = $props();
 
@@ -75,8 +76,7 @@
     });
 </script>
 
-<article class="coin-rail-card">
-    <h3>{coin.symbol.toUpperCase()} to USD converter</h3>
+<CoinRailCard title="{coin.symbol.toUpperCase()} to USD converter">
     <div class="coin-converter-box" aria-label="Coin converter">
         <div class="coin-converter-row">
             <span>{coin.symbol.toUpperCase()}</span>
@@ -101,4 +101,4 @@
             />
         </div>
     </div>
-</article>
+</CoinRailCard>

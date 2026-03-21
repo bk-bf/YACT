@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { CryptoHeadline } from "./coin-detail-page.data";
+    import CoinRailCard from "./CoinRailCard.svelte";
 
     const { headlines }: { headlines: CryptoHeadline[] } = $props();
 
@@ -28,8 +29,7 @@
     );
 </script>
 
-<article class="coin-rail-card">
-    <h3>Latest</h3>
+<CoinRailCard title="Latest">
     <p class="coin-news-subtitle">Here is what happened in crypto today.</p>
     {#if sortedHeadlines.length > 0}
         <ul class="coin-news-list">
@@ -54,4 +54,4 @@
     {:else}
         <p class="muted">No headlines available right now.</p>
     {/if}
-</article>
+</CoinRailCard>

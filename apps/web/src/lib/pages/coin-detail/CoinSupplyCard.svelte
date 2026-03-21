@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { CoinBreakdown } from "./coin-detail-page.data";
     import { usd, formatWhole } from "../../utils/formatters";
+    import CoinRailCard from "./CoinRailCard.svelte";
 
     const { coin }: { coin: CoinBreakdown } = $props();
 
@@ -31,8 +32,7 @@
     );
 </script>
 
-<article class="coin-rail-card">
-    <h3>Supply</h3>
+<CoinRailCard title="Supply">
     <ul class="coin-rail-list">
         <li>
             <span>Circulating</span>
@@ -58,4 +58,4 @@
             <strong>{formatOptionalDate(coin.allTimeHighDate)}</strong>
         </li>
     </ul>
-</article>
+</CoinRailCard>

@@ -1,12 +1,12 @@
 <script lang="ts">
     import type { HighlightCoin } from "./coin-detail-page.data";
     import { percent } from "../../utils/formatters";
+    import CoinRailCard from "./CoinRailCard.svelte";
 
     const { topGainers }: { topGainers: HighlightCoin[] } = $props();
 </script>
 
-<article class="coin-rail-card">
-    <h3>Market Movers</h3>
+<CoinRailCard title="Market Movers">
     <ul class="coin-movers-list">
         {#each topGainers.slice(0, 3) as mover}
             <li>
@@ -21,4 +21,4 @@
             </li>
         {/each}
     </ul>
-</article>
+</CoinRailCard>

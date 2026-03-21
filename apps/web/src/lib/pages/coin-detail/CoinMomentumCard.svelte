@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { CoinBreakdown } from "./coin-detail-page.data";
+    import CoinRailCard from "./CoinRailCard.svelte";
 
     const { coin }: { coin: CoinBreakdown } = $props();
 
@@ -13,8 +14,7 @@
     const bearishShare = $derived(100 - bullishShare);
 </script>
 
-<article class="coin-rail-card">
-    <h3>24h Price Momentum</h3>
+<CoinRailCard title="24h Price Momentum">
     <div
         class="sentiment-bar"
         aria-label="Bullish vs bearish momentum from 24h price change"
@@ -26,4 +26,4 @@
             {bearishShare}%
         </span>
     </div>
-</article>
+</CoinRailCard>

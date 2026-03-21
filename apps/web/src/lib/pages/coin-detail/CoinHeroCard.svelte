@@ -1,11 +1,12 @@
 <script lang="ts">
     import type { CoinBreakdown } from "./coin-detail-page.data";
     import { usd, percent } from "../../utils/formatters";
+    import CoinRailCard from "./CoinRailCard.svelte";
 
     const { coin }: { coin: CoinBreakdown } = $props();
 </script>
 
-<article class="coin-rail-card coin-hero-card">
+<CoinRailCard extraClass="coin-hero-card">
     <div class="coin-terminal-identity">
         <div class="coin-title-wrap">
             <img src={coin.image} alt={coin.name} width="40" height="40" />
@@ -27,4 +28,4 @@
             {percent.format(coin.priceChangePercentage24h / 100)}
         </span>
     </div>
-</article>
+</CoinRailCard>

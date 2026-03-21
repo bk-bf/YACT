@@ -1,6 +1,8 @@
 <script lang="ts">
     import { browser } from "$app/environment";
     import type { CoinBreakdown } from "./coin-detail-page.data";
+    import CoinRailCard from "./CoinRailCard.svelte";
+    import InfoChipRow from "./InfoChipRow.svelte";
 
     const { coin }: { coin: CoinBreakdown } = $props();
 
@@ -209,13 +211,10 @@
     );
 </script>
 
-<article class="coin-rail-card">
-    <h3>Info</h3>
+<CoinRailCard title="Info">
 
-    <div class="info-chip-row">
-        <span class="info-row-label">API ID</span>
-        <div class="info-chip-wrap">
-            <button
+    <InfoChipRow label="API ID">
+        <button
                 class="info-pill info-pill-button"
                 type="button"
                 title={`Copy ${coin.apiId || coin.id}`}
@@ -231,13 +230,10 @@
                     {copiedInfoKey === "api-id" ? "✓" : "⧉"}
                 </span>
             </button>
-        </div>
-    </div>
+        </InfoChipRow>
 
-    <div class="info-chip-row">
-        <span class="info-row-label">Contract</span>
-        <div class="info-chip-wrap">
-            {#if coin.contracts.length > 0}
+    <InfoChipRow label="Contract">
+        {#if coin.contracts.length > 0}
                 {#each coin.contracts.slice(0, 4) as entry}
                     <button
                         class="info-pill info-pill-button contract-pill"
@@ -284,13 +280,10 @@
             {:else}
                 <span class="muted">--</span>
             {/if}
-        </div>
-    </div>
+        </InfoChipRow>
 
-    <div class="info-chip-row">
-        <span class="info-row-label">Chains</span>
-        <div class="info-chip-wrap">
-            {#if displayChainBadges.length > 0}
+    <InfoChipRow label="Chains">
+        {#if displayChainBadges.length > 0}
                 {#each displayChainBadges.slice(0, 8) as chainEntry}
                     <span class="info-pill chain-pill" title={chainEntry.chain}>
                         {#if chainEntry.logoUrl}
@@ -310,13 +303,10 @@
             {:else}
                 <span class="muted">--</span>
             {/if}
-        </div>
-    </div>
+        </InfoChipRow>
 
-    <div class="info-chip-row">
-        <span class="info-row-label">Categories</span>
-        <div class="info-chip-wrap">
-            {#if coin.categories.length > 0}
+    <InfoChipRow label="Categories">
+        {#if coin.categories.length > 0}
                 {#if coin.categories.length > 1}
                     <label class="info-select-wrap">
                         <select
@@ -335,13 +325,10 @@
             {:else}
                 <span class="muted">--</span>
             {/if}
-        </div>
-    </div>
+        </InfoChipRow>
 
-    <div class="info-chip-row">
-        <span class="info-row-label">Website</span>
-        <div class="info-chip-wrap">
-            {#if displayWebsiteLinks.length > 0}
+    <InfoChipRow label="Website">
+        {#if displayWebsiteLinks.length > 0}
                 {#each displayWebsiteLinks as websiteLink}
                     <a
                         class="info-pill info-link-pill"
@@ -355,13 +342,10 @@
             {:else}
                 <span class="muted">--</span>
             {/if}
-        </div>
-    </div>
+        </InfoChipRow>
 
-    <div class="info-chip-row">
-        <span class="info-row-label">Explorers</span>
-        <div class="info-chip-wrap">
-            {#if displayExplorers.length > 0}
+    <InfoChipRow label="Explorers">
+        {#if displayExplorers.length > 0}
                 {#each displayExplorers.slice(0, 4) as explorer}
                     <a
                         class="info-pill info-link-pill"
@@ -375,13 +359,10 @@
             {:else}
                 <span class="muted">--</span>
             {/if}
-        </div>
-    </div>
+        </InfoChipRow>
 
-    <div class="info-chip-row">
-        <span class="info-row-label">Community</span>
-        <div class="info-chip-wrap">
-            {#if displayCommunityLinks.length > 0}
+    <InfoChipRow label="Community">
+        {#if displayCommunityLinks.length > 0}
                 {#each displayCommunityLinks as communityLink}
                     <a
                         class="info-pill info-link-pill info-logo-pill"
@@ -401,13 +382,10 @@
             {:else}
                 <span class="muted">--</span>
             {/if}
-        </div>
-    </div>
+        </InfoChipRow>
 
-    <div class="info-chip-row">
-        <span class="info-row-label">Search on</span>
-        <div class="info-chip-wrap">
-            {#each searchBrandLinks as link}
+    <InfoChipRow label="Search on">
+        {#each searchBrandLinks as link}
                 <a
                     class="info-pill info-link-pill info-logo-pill"
                     href={link.url}
@@ -423,6 +401,5 @@
                     <span>{link.label}</span>
                 </a>
             {/each}
-        </div>
-    </div>
-</article>
+    </InfoChipRow>
+</CoinRailCard>

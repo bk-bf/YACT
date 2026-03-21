@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { CoinBreakdown } from "./coin-detail-page.data";
     import { formatStableCompactUsd } from "../../utils/formatters";
+    import CoinRailCard from "./CoinRailCard.svelte";
 
     const { coin }: { coin: CoinBreakdown } = $props();
 
@@ -21,8 +22,7 @@
     );
 </script>
 
-<article class="coin-rail-card">
-    <h3>Market Metrics</h3>
+<CoinRailCard title="Market Metrics">
     <ul class="coin-rail-list">
         <li>
             <span>Market cap</span>
@@ -41,4 +41,4 @@
             <strong>{fdvLabel}</strong>
         </li>
     </ul>
-</article>
+</CoinRailCard>

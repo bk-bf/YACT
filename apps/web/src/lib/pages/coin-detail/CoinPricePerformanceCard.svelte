@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { CoinBreakdown } from "./coin-detail-page.data";
     import { usd, percent } from "../../utils/formatters";
+    import CoinRailCard from "./CoinRailCard.svelte";
 
     const { coin }: { coin: CoinBreakdown } = $props();
 
@@ -45,8 +46,7 @@
     );
 </script>
 
-<article class="coin-rail-card">
-    <h3>Price performance</h3>
+<CoinRailCard title="Price performance">
     <div class="coin-range-head">
         <div>
             <small>Low (24h)</small>
@@ -115,4 +115,4 @@
     >
         See historical data <span aria-hidden="true">↗</span>
     </a>
-</article>
+</CoinRailCard>
