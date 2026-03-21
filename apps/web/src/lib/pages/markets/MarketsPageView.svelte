@@ -1,26 +1,68 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
     import M3Button from "../../components/M3Button.svelte";
-    import { createEmptyMarketsPageData } from "./markets-page.data";
+    import {
+        createEmptyMarketsPageData,
+        hasMeaningfulMarketsPayload,
+        loadMarketsPageData,
+    } from "./markets-page.data";
 
     // Ownership contract (BUG-002):
     // - This view renders route-owned payload only.
     // - Structural fallback is allowed for safety, but this component must not
     //   perform its own markets polling/refresh writes.
+    // - Exception: bounded recovery retries are allowed only when route payload
+    //   is empty, to avoid persistent zero-state lockups after slow navigation.
     // - Shared layout polling can update shell surfaces, not page-owned state.
     const fallbackData = createEmptyMarketsPageData();
     let { data } = $props();
+    let recoveredData = $state<typeof fallbackData | null>(null);
 
     // Safeguard: ensure data has required structure, falling back if any field is missing
     const viewData = $derived(
-        data &&
-            data.coins &&
-            data.global &&
-            data.highlights &&
-            data.highlights.trending !== undefined &&
-            data.highlights.topGainers !== undefined
-            ? data
+        (recoveredData ?? data) &&
+            (recoveredData ?? data).coins &&
+            (recoveredData ?? data).global &&
+            (recoveredData ?? data).highlights &&
+            (recoveredData ?? data).highlights.trending !== undefined &&
+            (recoveredData ?? data).highlights.topGainers !== undefined
+            ? (recoveredData ?? data)
             : fallbackData,
     );
+
+    $effect(() => {
+        if (!browser) return;
+        if (recoveredData !== null) return;
+
+        const current = data ?? fallbackData;
+        if (hasMeaningfulMarketsPayload(current)) return;
+
+        let cancelled = false;
+
+        // Recovery retries: if route payload arrived empty, fetch a fresh payload
+        // up to 3 times in case the first request was cancelled in navigation.
+        void (async () => {
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+                const next = await loadMarketsPageData(fetch, 5000);
+                if (cancelled) {
+                    return;
+                }
+
+                if (hasMeaningfulMarketsPayload(next)) {
+                    recoveredData = next;
+                    return;
+                }
+
+                if (attempt < 2) {
+                    await new Promise((resolve) => setTimeout(resolve, 350));
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    });
 
     const usd = new Intl.NumberFormat("en-US", {
         style: "currency",
@@ -32,13 +74,6 @@
         style: "percent",
         maximumFractionDigits: 2,
         signDisplay: "always",
-    });
-
-    const compactUsd = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        notation: "compact",
-        maximumFractionDigits: 2,
     });
 
     const fullUsd = new Intl.NumberFormat("en-US", {
@@ -128,6 +163,27 @@
         return value >= 1000 ? largeUsd.format(value) : fullUsd.format(value);
     }
 
+    function formatStableCompactUsd(value: number | null | undefined): string {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return "--";
+        }
+
+        const abs = Math.abs(value);
+        if (abs >= 1_000_000_000_000) {
+            return `$${(value / 1_000_000_000_000).toFixed(2)}T`;
+        }
+        if (abs >= 1_000_000_000) {
+            return `$${(value / 1_000_000_000).toFixed(2)}B`;
+        }
+        if (abs >= 1_000_000) {
+            return `$${(value / 1_000_000).toFixed(2)}M`;
+        }
+        if (abs >= 1_000) {
+            return `$${(value / 1_000).toFixed(2)}K`;
+        }
+        return `$${value.toFixed(2)}`;
+    }
+
     function formatTwoDecimals(value: number | null | undefined): string {
         if (value === null || value === undefined || !Number.isFinite(value)) {
             return "--";
@@ -192,7 +248,7 @@
                 </span>
             </p>
             <p class="muted">
-                Reference compact value: {compactUsd.format(
+                Reference compact value: {formatStableCompactUsd(
                     viewData.global.totalMarketCapUsd,
                 )}
             </p>
@@ -392,8 +448,8 @@
                                     <path d={sparklinePath(coin.sparkline7d)} />
                                 </svg>
                             </td>
-                            <td>{compactUsd.format(coin.marketCap)}</td>
-                            <td>{compactUsd.format(coin.totalVolume24h)}</td>
+                            <td>{formatStableCompactUsd(coin.marketCap)}</td>
+                            <td>{formatStableCompactUsd(coin.totalVolume24h)}</td>
                             <td>
                                 {compactNumber.format(coin.circulatingSupply)}
                                 {coin.symbol.toUpperCase()}

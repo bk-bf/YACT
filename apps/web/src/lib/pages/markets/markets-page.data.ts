@@ -59,11 +59,27 @@ type MarketsPageData = ReturnType<typeof normalizeMarketsPayload>;
 
 function normalizeMarketsPayload(payload: Partial<MarketsResponse> | null) {
     const safePayload = payload ?? {};
+    const safeHighlights = safePayload.highlights ?? {};
+    const safeGlobal = safePayload.global ?? {};
+
     return {
         coins: Array.isArray(safePayload.coins) ? safePayload.coins : [],
-        global: safePayload.global ?? EMPTY_GLOBAL,
+        global: {
+            ...EMPTY_GLOBAL,
+            ...safeGlobal,
+            marketCapSparkline7d: Array.isArray(safeGlobal.marketCapSparkline7d)
+                ? safeGlobal.marketCapSparkline7d
+                : EMPTY_GLOBAL.marketCapSparkline7d,
+        },
         headlines: Array.isArray(safePayload.headlines) ? safePayload.headlines : [],
-        highlights: safePayload.highlights ?? EMPTY_HIGHLIGHTS,
+        highlights: {
+            trending: Array.isArray(safeHighlights.trending)
+                ? safeHighlights.trending
+                : EMPTY_HIGHLIGHTS.trending,
+            topGainers: Array.isArray(safeHighlights.topGainers)
+                ? safeHighlights.topGainers
+                : EMPTY_HIGHLIGHTS.topGainers,
+        },
         source: safePayload.source ?? 'analytics-api',
         snapshotTs: safePayload.snapshotTs ?? safePayload.ts ?? null,
         stale: safePayload.stale ?? false,
@@ -71,8 +87,46 @@ function normalizeMarketsPayload(payload: Partial<MarketsResponse> | null) {
     };
 }
 
+export function hasMeaningfulMarketsPayload(payload: ReturnType<typeof normalizeMarketsPayload>): boolean {
+    return (
+        payload.coins.length > 0 ||
+        payload.global.totalMarketCapUsd > 0 ||
+        payload.highlights.trending.length > 0 ||
+        payload.highlights.topGainers.length > 0
+    );
+}
+
 export function createEmptyMarketsPageData(): MarketsPageData {
     return normalizeMarketsPayload(null);
+}
+
+async function fetchMarketsPayload(
+    fetchFn: typeof fetch,
+    timeoutMs: number,
+): Promise<MarketsPageData | null> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetchFn('/api/markets', {
+            signal: controller.signal,
+        });
+
+        let payload: Partial<MarketsResponse> = {};
+        try {
+            payload = (await response.json()) as Partial<MarketsResponse>;
+        } catch {
+            payload = {};
+        }
+
+        return normalizeMarketsPayload(
+            response.ok ? payload : { ...payload, stale: true },
+        );
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 /**
@@ -82,22 +136,8 @@ export function createEmptyMarketsPageData(): MarketsPageData {
  */
 export async function loadMarketsPageData(
     fetchFn: typeof fetch,
-    timeoutMs = 3500,
+    timeoutMs = 3000,
 ): Promise<MarketsPageData> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-        const response = await fetchFn('/api/markets', {
-            signal: controller.signal,
-        });
-        const payload = (await response.json()) as Partial<MarketsResponse>;
-
-        return normalizeMarketsPayload(response.ok ? payload : { ...payload, stale: true });
-    } catch {
-        // Timeout, network error, or parse error → return empty structure
-        return createEmptyMarketsPageData();
-    } finally {
-        clearTimeout(timer);
-    }
+    const result = await fetchMarketsPayload(fetchFn, timeoutMs);
+    return result ?? createEmptyMarketsPageData();
 }
