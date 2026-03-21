@@ -212,9 +212,11 @@
 
             const tag = interactive.tagName.toLowerCase();
             const label =
-                (interactive.getAttribute("aria-label") ??
+                (
+                    interactive.getAttribute("aria-label") ??
                     interactive.textContent ??
-                    "")
+                    ""
+                )
                     .replace(/\s+/g, " ")
                     .trim()
                     .slice(0, 120) || null;
