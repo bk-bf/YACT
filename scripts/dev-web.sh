@@ -26,4 +26,18 @@ else
 	echo "[dev-web] warning: curl not found, skipping API preflight check"
 fi
 
-pnpm run dev:web
+# Run the dev server in a new process group so a single kill signal takes
+# down Vite and all its child processes, releasing the port immediately.
+set +e
+pnpm run dev:web &
+DEV_PID=$!
+
+_cleanup() {
+	echo "[dev-web] shutting down (pid=${DEV_PID})"
+	kill -- "-${DEV_PID}" 2>/dev/null || kill "${DEV_PID}" 2>/dev/null || true
+	wait "${DEV_PID}" 2>/dev/null || true
+	echo "[dev-web] port released"
+}
+trap _cleanup EXIT INT TERM
+
+wait "${DEV_PID}"
