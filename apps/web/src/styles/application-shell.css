@@ -53,8 +53,10 @@ a {
 
 .terminal-header {
     margin-bottom: var(--space-6);
-    border-bottom: 1px solid var(--color-divider);
-    background: transparent;
+    border-bottom: 1px solid rgba(110, 40, 180, 0.22);
+    background: linear-gradient(180deg, rgba(14, 5, 26, 0.92) 0%, rgba(7, 3, 12, 0.72) 100%);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .top-nav-main {
@@ -63,7 +65,7 @@ a {
     justify-content: space-between;
     gap: var(--space-4);
     padding: var(--space-4);
-    border-bottom: 1px solid var(--tv-border);
+    border-bottom: 1px solid rgba(80, 30, 130, 0.3);
 }
 
 .top-nav-right {
@@ -88,6 +90,12 @@ a {
     background: var(--color-brand-bg);
     padding: 0.25rem 0.45rem;
     border-radius: 999px;
+    box-shadow: 0 0 8px rgba(179, 85, 255, 0.22);
+    transition: box-shadow 0.2s ease;
+}
+
+.brand:hover .brand-badge {
+    box-shadow: 0 0 16px rgba(179, 85, 255, 0.5);
 }
 
 .brand-name {
@@ -110,6 +118,7 @@ a {
     color: var(--color-text-nav);
     font-weight: 600;
     cursor: pointer;
+    transition: color 0.18s ease;
 }
 
 .menu-links .menu-link:last-child {
@@ -118,6 +127,7 @@ a {
 
 .menu-link:hover {
     color: var(--color-accent-text);
+    text-shadow: 0 0 10px rgba(179, 85, 255, 0.3);
 }
 
 .floating-headlines-dropdown {
@@ -216,8 +226,8 @@ a {
     border-radius: 999px;
     overflow: hidden;
     background: rgba(30, 8, 60, 0.6);
-    max-width: min(720px, 50vw);
-    min-width: 300px;
+    max-width: min(440px, 34vw);
+    min-width: 180px;
     height: 1.75rem;
 }
 
@@ -307,9 +317,19 @@ a {
 }
 
 .menu-action.filled {
-    background: transparent;
-    border-left-color: var(--color-action-border);
-    color: var(--tv-highlight);
+    background: rgba(90, 15, 160, 0.12);
+    border: 1px solid rgba(150, 50, 230, 0.45);
+    border-radius: 6px;
+    margin-left: 0.5rem;
+    color: var(--tv-highlight-soft);
+    transition: background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.menu-action.filled:hover {
+    background: rgba(110, 25, 200, 0.22);
+    border-color: rgba(170, 70, 255, 0.72);
+    box-shadow: 0 0 14px rgba(120, 20, 210, 0.3);
+    filter: brightness(1);
 }
 
 .menu-action.outlined {
@@ -469,6 +489,7 @@ a {
     backdrop-filter: blur(10px);
     padding: 0.46rem 0.6rem;
     box-shadow: 0 2px 20px rgba(120, 20, 200, 0.22);
+    border-radius: 0 0 14px 14px;
 }
 
 .market-floating-stats {

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { browser } from "$app/environment";
+    import { createPriceJitter, isCoinJitterEligible } from "../../effects/usePriceJitter.svelte";
     import M3Button from "../../components/M3Button.svelte";
     import {
         coerceMarketsPageData,
@@ -275,75 +276,34 @@
         return fullInteger.format(value);
     }
 
-    // ── Live price jitter (CMC-style ticker) ──────────────────────────────
-    const STABLE_SYMBOLS = new Set([
-        "usdt","usdc","dai","busd","tusd","usdp","gusd","frax","lusd",
-        "susd","usdd","usds","pyusd","crvusd","fdusd","eurc","usdx",
-    ]);
-
-    function isStablecoin(coin: { symbol: string; currentPrice: number; priceChangePercentage24h: number }): boolean {
-        return (
-            STABLE_SYMBOLS.has(coin.symbol.toLowerCase()) ||
-            (Math.abs(coin.currentPrice - 1) < 0.025 && Math.abs(coin.priceChangePercentage24h) < 0.6)
-        );
-    }
-
-    function isJitterEligible(coin: { symbol: string; currentPrice: number; priceChangePercentage24h: number }): boolean {
-        return !isStablecoin(coin) && coin.currentPrice >= 1;
-    }
-
-    function nudgePrice(price: number): number {
-        if (price >= 10000) {
-            return Math.max(0.01, price + Math.round((Math.random() * 2 - 1) * 18));
-        }
-        if (price >= 1000) {
-            return Math.max(0.01, price + Math.round((Math.random() * 2 - 1) * 4));
-        }
-        if (price >= 100) {
-            return Math.max(0.01, Math.round((price + (Math.random() * 2 - 1) * 0.9) * 100) / 100);
-        }
-        if (price >= 10) {
-            return Math.max(0.01, Math.round((price + (Math.random() * 2 - 1) * 0.12) * 100) / 100);
-        }
-        return Math.max(0.001, Math.round((price + (Math.random() * 2 - 1) * 0.015) * 1000) / 1000);
-    }
-
-    let jitterPrices = $state<Record<string, number>>({});
-    let jitterFlash  = $state<Record<string, "up" | "down" | "">>({});
+    // ── Live price jitter — managed by usePriceJitter composable ──────────
+    const jitter = createPriceJitter();
 
     $effect(() => {
         if (!browser) return;
 
-        const coins = viewData.coins;
-        let cancelled = false;
+        const coinEntries = viewData.coins
+            .filter(isCoinJitterEligible)
+            .map((c) => ({ id: c.id, value: c.currentPrice }));
 
-        function scheduleJitter(coinId: string, basePrice: number, delay: number) {
-            if (cancelled) return;
-            setTimeout(() => {
-                if (cancelled) return;
-                const current = jitterPrices[coinId] ?? basePrice;
-                const next    = nudgePrice(current);
-                const dir: "up" | "down" = next >= current ? "up" : "down";
-                jitterPrices[coinId] = next;
-                jitterFlash[coinId]  = dir;
-                setTimeout(() => { if (!cancelled) jitterFlash[coinId] = ""; }, 480);
-                scheduleJitter(coinId, next, 4000 + Math.random() * 9500);
-            }, delay);
-        }
+        const macroEntries = [
+            {
+                id: "globalMarketCap",
+                value: viewData.global.totalMarketCapUsd,
+                scale: "macro" as const,
+            },
+            {
+                id: "globalVolume",
+                value: viewData.global.totalVolumeUsd,
+                scale: "macro" as const,
+            },
+        ];
 
-        for (const coin of coins) {
-            if (isJitterEligible(coin)) {
-                // stagger initial ticks so coins never update simultaneously
-                scheduleJitter(coin.id, coin.currentPrice, 500 + Math.random() * 7000);
-            }
-        }
-
-        return () => { cancelled = true; };
+        return jitter.start([...coinEntries, ...macroEntries]);
     });
 
-    function formatJitterUsd(coinId: string, basePrice: number): string {
-        const p = jitterPrices[coinId] ?? basePrice;
-        return formatDetailedUsd(p);
+    function formatJitterUsd(key: string, base: number): string {
+        return formatDetailedUsd(jitter.getValue(key, base));
     }
 </script>
 
@@ -354,7 +314,7 @@
 <section class="market-overview">
     <div class="market-overview-head">
         <div>
-            <h1>💎 Cryptocurrency Prices by Market Cap</h1>
+            <h1>Cryptocurrency Prices by Market Cap</h1>
             <p class="market-overview-subtitle">
                 The global crypto market cap today is
                 <span class="market-overview-pill">
@@ -382,7 +342,13 @@
 
     <div class="overview-grid">
         <article class="overview-stat-card">
-            <h3>{formatDetailedUsd(viewData.global.totalMarketCapUsd)}</h3>
+            <h3
+                class={jitter.getFlash("globalMarketCap") === "up"
+                    ? "price-tick-up"
+                    : jitter.getFlash("globalMarketCap") === "down"
+                      ? "price-tick-down"
+                      : ""}
+            >{formatJitterUsd("globalMarketCap", viewData.global.totalMarketCapUsd)}</h3>
             <p>
                 Market Cap
                 <span
@@ -412,7 +378,13 @@
         </article>
 
         <article class="overview-stat-card">
-            <h3>{formatDetailedUsd(viewData.global.totalVolumeUsd)}</h3>
+            <h3
+                class={jitter.getFlash("globalVolume") === "up"
+                    ? "price-tick-up"
+                    : jitter.getFlash("globalVolume") === "down"
+                      ? "price-tick-down"
+                      : ""}
+            >{formatJitterUsd("globalVolume", viewData.global.totalVolumeUsd)}</h3>
             <p>24h Trading Volume</p>
             <p class="muted">
                 BTC Dominance: {formatTwoDecimals(
@@ -452,9 +424,9 @@
                         </div>
                         <div class="overview-coin-right">
                             <span
-                                class={`overview-coin-value ${jitterFlash[coin.id] === "up" ? "price-tick-up" : jitterFlash[coin.id] === "down" ? "price-tick-down" : ""}`}
+                                class={`overview-coin-value ${jitter.getFlash(coin.id) === "up" ? "price-tick-up" : jitter.getFlash(coin.id) === "down" ? "price-tick-down" : ""}`}
                             >
-                                {isJitterEligible(coin)
+                                {isCoinJitterEligible(coin)
                                     ? formatJitterUsd(coin.id, coin.currentPrice)
                                     : fullUsd.format(coin.currentPrice)}
                             </span>
@@ -512,7 +484,7 @@
 </section>
 
 <section class="market-section">
-    <h2 class="m3-surface-title">📊 Top 100 Cryptocurrencies By Market Cap</h2>
+    <h2 class="m3-surface-title">Top 100 Cryptocurrencies By Market Cap</h2>
     {#if viewData.error}
         <p class="error-text">Unable to load market data: {viewData.error}</p>
     {:else}
@@ -607,13 +579,13 @@
                                 </div>
                             </td>
                             <td
-                                class={jitterFlash[coin.id] === "up"
+                                class={jitter.getFlash(coin.id) === "up"
                                     ? "price-tick-up"
-                                    : jitterFlash[coin.id] === "down"
+                                    : jitter.getFlash(coin.id) === "down"
                                       ? "price-tick-down"
                                       : ""}
                             >
-                                {isJitterEligible(coin)
+                                {isCoinJitterEligible(coin)
                                     ? formatJitterUsd(coin.id, coin.currentPrice)
                                     : usd.format(coin.currentPrice)}
                             </td>
