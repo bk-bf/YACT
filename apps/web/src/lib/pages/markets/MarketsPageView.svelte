@@ -316,7 +316,7 @@
     <title>YACT Top 100 Markets</title>
 </svelte:head>
 
-<!-- market-overview section temporarily hidden
+{#if false}<!-- market-overview section temporarily hidden -->
 <section class="market-overview">
     <div class="market-overview-head">
         <div>
@@ -524,7 +524,7 @@
         </article>
     </div>
 </section>
--->
+{/if}
 
 <section class="market-section">
     <h2 class="m3-surface-title">Top 100 Cryptocurrencies By Market Cap</h2>
