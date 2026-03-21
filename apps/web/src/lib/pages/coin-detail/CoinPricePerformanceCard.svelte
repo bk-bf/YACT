@@ -26,7 +26,11 @@
     const dayRangeSpread = $derived(Math.max(0, high24h - low24h));
     const dayRangeProgress = $derived(
         dayRangeSpread > 0
-            ? clamp(((coin.currentPrice - low24h) / dayRangeSpread) * 100, 0, 100)
+            ? clamp(
+                  ((coin.currentPrice - low24h) / dayRangeSpread) * 100,
+                  0,
+                  100,
+              )
             : 50,
     );
     const athDistancePct = $derived(
@@ -54,12 +58,17 @@
         </div>
     </div>
     <div class="coin-range-track" aria-label="24h range">
-        <span class="coin-range-thumb" style={`left:${dayRangeProgress}%`}></span>
+        <span class="coin-range-thumb" style={`left:${dayRangeProgress}%`}
+        ></span>
     </div>
     <ul class="coin-rail-list coin-performance-list">
         <li>
             <span>All-time high</span>
-            <strong>{coin.allTimeHigh > 0 ? usd.format(coin.allTimeHigh) : "--"}</strong>
+            <strong
+                >{coin.allTimeHigh > 0
+                    ? usd.format(coin.allTimeHigh)
+                    : "--"}</strong
+            >
         </li>
         <li>
             <span>{formatDateShort(coin.allTimeHighDate)}</span>
@@ -77,7 +86,11 @@
         </li>
         <li>
             <span>All-time low</span>
-            <strong>{coin.allTimeLow > 0 ? usd.format(coin.allTimeLow) : "--"}</strong>
+            <strong
+                >{coin.allTimeLow > 0
+                    ? usd.format(coin.allTimeLow)
+                    : "--"}</strong
+            >
         </li>
         <li>
             <span>{formatDateShort(coin.allTimeLowDate)}</span>
@@ -94,7 +107,12 @@
             </strong>
         </li>
     </ul>
-    <a href={coin.coingeckoUrl} target="_blank" rel="noreferrer" class="coin-inline-link">
+    <a
+        href={coin.coingeckoUrl}
+        target="_blank"
+        rel="noreferrer"
+        class="coin-inline-link"
+    >
         See historical data <span aria-hidden="true">↗</span>
     </a>
 </article>

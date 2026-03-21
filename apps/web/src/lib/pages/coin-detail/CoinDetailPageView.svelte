@@ -285,7 +285,9 @@
                 role="tablist"
                 aria-label="Coin sections"
             >
-                <button class="coin-terminal-tab active" type="button">Chart</button>
+                <button class="coin-terminal-tab active" type="button"
+                    >Chart</button
+                >
                 <button class="coin-terminal-tab" type="button">Markets</button>
                 <button class="coin-terminal-tab" type="button">News</button>
                 <button class="coin-terminal-tab" type="button">Yield</button>

@@ -18,6 +18,8 @@
             <p>{para}</p>
         {/each}
     {:else}
-        <p class="muted">No description available from the current data source.</p>
+        <p class="muted">
+            No description available from the current data source.
+        </p>
     {/if}
 </article>

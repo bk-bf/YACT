@@ -35,13 +35,21 @@
     function logoForLink(label: string, url: string): string {
         const normalized = label.trim().toLowerCase();
         if (normalized === "x") return "https://x.com/favicon.ico";
-        if (normalized === "reddit") return "https://www.reddit.com/favicon.ico";
-        if (normalized === "coingecko") return "https://www.coingecko.com/favicon.ico";
-        if (normalized === "coinmarketcap") return "https://coinmarketcap.com/favicon.ico";
+        if (normalized === "reddit")
+            return "https://www.reddit.com/favicon.ico";
+        if (normalized === "coingecko")
+            return "https://www.coingecko.com/favicon.ico";
+        if (normalized === "coinmarketcap")
+            return "https://coinmarketcap.com/favicon.ico";
 
         try {
             const host = new URL(url).hostname.toLowerCase();
-            if (host === "x.com" || host.endsWith(".x.com") || host === "twitter.com" || host.endsWith(".twitter.com")) {
+            if (
+                host === "x.com" ||
+                host.endsWith(".x.com") ||
+                host === "twitter.com" ||
+                host.endsWith(".twitter.com")
+            ) {
                 return "https://x.com/favicon.ico";
             }
             if (host === "reddit.com" || host.endsWith(".reddit.com")) {
@@ -60,10 +68,28 @@
 
         try {
             const host = new URL(url).hostname.toLowerCase();
-            if (host === "facebook.com" || host.endsWith(".facebook.com") || host === "m.facebook.com") return "Facebook";
-            if (host === "t.me" || host.endsWith(".t.me") || host === "telegram.me" || host.endsWith(".telegram.me")) return "Telegram";
-            if (host === "x.com" || host.endsWith(".x.com") || host === "twitter.com" || host.endsWith(".twitter.com")) return "X";
-            if (host === "reddit.com" || host.endsWith(".reddit.com")) return "Reddit";
+            if (
+                host === "facebook.com" ||
+                host.endsWith(".facebook.com") ||
+                host === "m.facebook.com"
+            )
+                return "Facebook";
+            if (
+                host === "t.me" ||
+                host.endsWith(".t.me") ||
+                host === "telegram.me" ||
+                host.endsWith(".telegram.me")
+            )
+                return "Telegram";
+            if (
+                host === "x.com" ||
+                host.endsWith(".x.com") ||
+                host === "twitter.com" ||
+                host.endsWith(".twitter.com")
+            )
+                return "X";
+            if (host === "reddit.com" || host.endsWith(".reddit.com"))
+                return "Reddit";
         } catch {
             // keep fallback below
         }
@@ -114,7 +140,10 @@
                 new Map(
                     coin.contracts
                         .filter((e) => e.chain.trim().length > 0)
-                        .map((e) => [e.chain, { chain: e.chain, logoUrl: e.logoUrl }]),
+                        .map((e) => [
+                            e.chain,
+                            { chain: e.chain, logoUrl: e.logoUrl },
+                        ]),
                 ).values(),
             );
             if (fromContracts.length > 0) return fromContracts;
@@ -135,7 +164,8 @@
     const displayWebsiteLinks = $derived(
         [
             ...displayWebsites.map((url) => ({ label: hostLabel(url), url })),
-            ...(coin.whitepaper && !displayWebsites.some((u) => u === coin.whitepaper)
+            ...(coin.whitepaper &&
+            !displayWebsites.some((u) => u === coin.whitepaper)
                 ? [{ label: "Whitepaper", url: coin.whitepaper }]
                 : []),
         ].slice(0, 4),
@@ -161,7 +191,10 @@
         displayCommunity.map((link) => ({
             label: communityLabelForLink(link.label, link.url),
             url: link.url,
-            logoUrl: logoForLink(communityLabelForLink(link.label, link.url), link.url),
+            logoUrl: logoForLink(
+                communityLabelForLink(link.label, link.url),
+                link.url,
+            ),
         })),
     );
 
@@ -169,7 +202,10 @@
         [
             { label: "CoinGecko", url: coin.coingeckoUrl },
             { label: "CoinMarketCap", url: coin.coinmarketcapUrl },
-        ].map((link) => ({ ...link, logoUrl: logoForLink(link.label, link.url) })),
+        ].map((link) => ({
+            ...link,
+            logoUrl: logoForLink(link.label, link.url),
+        })),
     );
 </script>
 
@@ -188,7 +224,9 @@
                 <span>{coin.apiId || coin.id}</span>
                 <span
                     class="info-copy-icon"
-                    aria-label={copiedInfoKey === "api-id" ? "Copied" : "Copy API ID"}
+                    aria-label={copiedInfoKey === "api-id"
+                        ? "Copied"
+                        : "Copy API ID"}
                 >
                     {copiedInfoKey === "api-id" ? "✓" : "⧉"}
                 </span>
@@ -205,7 +243,11 @@
                         class="info-pill info-pill-button contract-pill"
                         type="button"
                         title={entry.address}
-                        onclick={() => copyInfoValue(entry.address, `contract-${entry.address}`)}
+                        onclick={() =>
+                            copyInfoValue(
+                                entry.address,
+                                `contract-${entry.address}`,
+                            )}
                     >
                         {#if entry.logoUrl}
                             <img
@@ -215,7 +257,11 @@
                                 loading="lazy"
                             />
                         {:else}
-                            <span class="chain-logo" aria-hidden="true" title={entry.chain}>
+                            <span
+                                class="chain-logo"
+                                aria-hidden="true"
+                                title={entry.chain}
+                            >
                                 {chainMonogram(entry.chain)}
                             </span>
                         {/if}
@@ -224,11 +270,14 @@
                         </span>
                         <span
                             class="info-copy-icon"
-                            aria-label={copiedInfoKey === `contract-${entry.address}`
+                            aria-label={copiedInfoKey ===
+                            `contract-${entry.address}`
                                 ? "Copied"
                                 : "Copy contract address"}
                         >
-                            {copiedInfoKey === `contract-${entry.address}` ? "✓" : "⧉"}
+                            {copiedInfoKey === `contract-${entry.address}`
+                                ? "✓"
+                                : "⧉"}
                         </span>
                     </button>
                 {/each}

@@ -12,7 +12,9 @@
             <li>
                 <a href={`/currencies/${mover.id}`}>{mover.name}</a>
                 <span
-                    class={mover.priceChangePercentage24h >= 0 ? "positive" : "negative"}
+                    class={mover.priceChangePercentage24h >= 0
+                        ? "positive"
+                        : "negative"}
                 >
                     {percent.format(mover.priceChangePercentage24h / 100)}
                 </span>

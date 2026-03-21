@@ -1814,7 +1814,7 @@ a {
     color: var(--tv-text-muted);
 }
 
-.coin-about-card p + p {
+.coin-about-card p+p {
     margin-top: var(--space-3);
 }
 

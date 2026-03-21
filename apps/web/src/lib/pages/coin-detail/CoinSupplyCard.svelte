@@ -47,7 +47,11 @@
         </li>
         <li>
             <span>All-time high</span>
-            <strong>{coin.allTimeHigh > 0 ? usd.format(coin.allTimeHigh) : "--"}</strong>
+            <strong
+                >{coin.allTimeHigh > 0
+                    ? usd.format(coin.allTimeHigh)
+                    : "--"}</strong
+            >
         </li>
         <li>
             <span>ATH date</span>

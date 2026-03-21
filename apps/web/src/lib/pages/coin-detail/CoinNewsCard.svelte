@@ -19,7 +19,8 @@
     const sortedHeadlines = $derived(
         [...headlines]
             .sort((a, b) => {
-                const tsDelta = +new Date(b.publishedAt) - +new Date(a.publishedAt);
+                const tsDelta =
+                    +new Date(b.publishedAt) - +new Date(a.publishedAt);
                 if (tsDelta !== 0) return tsDelta;
                 return a.id.localeCompare(b.id);
             })
@@ -43,7 +44,9 @@
                         {headline.title}
                     </a>
                     <p class="coin-news-meta">
-                        {headline.source} • {formatHeadlineDate(headline.publishedAt)}
+                        {headline.source} • {formatHeadlineDate(
+                            headline.publishedAt,
+                        )}
                     </p>
                 </li>
             {/each}
