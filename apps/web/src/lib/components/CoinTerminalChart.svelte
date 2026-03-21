@@ -192,14 +192,18 @@
             high: number;
             low: number;
         }> = [];
-        const chunkSize = Math.max(2, Math.floor(values.length / buckets));
+        // When there are fewer data points than desired buckets, produce at most
+        // one candle per data point rather than forcing a minimum chunk size of 2
+        // (which would throw away half the data and produce wide, wick-less blobs).
+        const effectiveBuckets = Math.max(1, Math.min(buckets, values.length));
+        const chunkSize = Math.max(1, Math.floor(values.length / effectiveBuckets));
 
-        for (let i = 0; i < values.length - 1; i += chunkSize) {
+        for (let i = 0; i < values.length; i += chunkSize) {
             const chunk = values.slice(
                 i,
                 Math.min(values.length, i + chunkSize),
             );
-            if (chunk.length < 2) {
+            if (chunk.length < 1) {
                 continue;
             }
 
