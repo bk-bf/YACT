@@ -1,9 +1,15 @@
 <script lang="ts">
-    import type { ViewSettings, OverviewStyleVariant } from "../composables/useViewSettings.svelte";
+    import type {
+        ViewSettings,
+        OverviewStyleVariant,
+    } from "../composables/useViewSettings.svelte";
 
     const { settings }: { settings: ViewSettings } = $props();
 
-    const overviewStyleOptions: Array<{ value: OverviewStyleVariant; label: string }> = [
+    const overviewStyleOptions: Array<{
+        value: OverviewStyleVariant;
+        label: string;
+    }> = [
         { value: "separate", label: "Separate bubbles" },
         { value: "unified", label: "One bubble" },
         { value: "minimal", label: "Flat / minimal" },
@@ -32,8 +38,8 @@
         type="button"
         aria-label="View settings"
         aria-expanded={open}
-        onclick={() => (open = !open)}
-    >⚙</button>
+        onclick={() => (open = !open)}>⚙</button
+    >
 
     {#if open}
         <div class="settings-panel">
@@ -46,7 +52,9 @@
                             name="overview-style"
                             value={opt.value}
                             checked={settings.overviewStyle === opt.value}
-                            onchange={() => { settings.overviewStyle = opt.value; }}
+                            onchange={() => {
+                                settings.overviewStyle = opt.value;
+                            }}
                         />
                         {opt.label}
                     </label>
@@ -58,7 +66,10 @@
                     <input
                         type="checkbox"
                         checked={settings.showMarketCapPill}
-                        onchange={() => { settings.showMarketCapPill = !settings.showMarketCapPill; }}
+                        onchange={() => {
+                            settings.showMarketCapPill =
+                                !settings.showMarketCapPill;
+                        }}
                     />
                     Show pill in overview heading
                 </label>
