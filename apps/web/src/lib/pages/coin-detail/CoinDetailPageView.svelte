@@ -79,11 +79,7 @@
         // Unified pipeline: coin + chart + headlines all in parallel (same as route load).
         try {
             await progressive.loadCritical(() =>
-                loadCoinDetailPageData(
-                    fetch,
-                    coin.id,
-                    abortController.signal,
-                ),
+                loadCoinDetailPageData(fetch, coin.id, abortController.signal),
             );
 
             if (!isCoinDetailViewActive) {
