@@ -74,6 +74,14 @@
             >
         >
     >({});
+    // Last series with real data (≥2 pts). Mirrors the BUG-002 hasMeaningfulGlobal guard:
+    // never let a non-meaningful placeholder overwrite displayed state while a fetch is in-flight.
+    let lastMeaningfulSeries = $state<{
+        prices: number[];
+        volumes: number[];
+        timestamps: number[];
+    } | null>(null);
+    let chartFetchInFlight = $state(false);
     let chartFetchRequestId = 0;
     let chartSvg: SVGSVGElement | null = null;
     let hoveredIndex = $state<number | null>(null);
@@ -323,6 +331,12 @@
             return remote;
         }
 
+        // BUG-002 guard: while a fetch is in-flight for the selected range, hold the last
+        // meaningful series (previous range or 7d seed) rather than flashing a flat line.
+        if (lastMeaningfulSeries && lastMeaningfulSeries.prices.length > 1) {
+            return lastMeaningfulSeries;
+        }
+
         // Only 7D has a meaningful server-provided seed in coin payload.
         // For other ranges, avoid reusing 7D-like data because it is misleading.
         if (chartRange !== "7d") {
@@ -537,6 +551,7 @@
             return;
         }
 
+        chartFetchInFlight = true;
         const requestId = ++chartFetchRequestId;
         void fetch(`/api/coins/${coin.id}/chart?range=${range}`, {
             cache: "default",
@@ -619,27 +634,27 @@
                         getRangeDurationHours(range, prices.length),
                     );
 
+                const series = {
+                    prices,
+                    volumes:
+                        volumes.length > 1
+                            ? volumes
+                            : toFallbackSeries(prices, coin.totalVolume24h)
+                                  .volumes,
+                    timestamps:
+                        timestamps.length === prices.length
+                            ? timestamps
+                            : buildSyntheticTimestamps(
+                                  prices.length,
+                                  getRangeDurationHours(range, prices.length),
+                              ),
+                };
                 chartSeriesByRange = {
                     ...chartSeriesByRange,
-                    [range]: {
-                        prices,
-                        volumes:
-                            volumes.length > 1
-                                ? volumes
-                                : toFallbackSeries(prices, coin.totalVolume24h)
-                                      .volumes,
-                        timestamps:
-                            timestamps.length === prices.length
-                                ? timestamps
-                                : buildSyntheticTimestamps(
-                                      prices.length,
-                                      getRangeDurationHours(
-                                          range,
-                                          prices.length,
-                                      ),
-                                  ),
-                    },
+                    [range]: series,
                 };
+                lastMeaningfulSeries = series;
+                chartFetchInFlight = false;
                 chartRangeErrorByRange = {
                     ...chartRangeErrorByRange,
                     [range]: null,
@@ -655,6 +670,7 @@
                 }
             })
             .catch((error) => {
+                chartFetchInFlight = false;
                 console.warn("[coin-chart]", {
                     phase: "fetch-error",
                     coinId: coin.id,
@@ -712,6 +728,32 @@
                 /* silent — 24h pre-warm is best-effort */
             });
     });
+
+    // BUG-002 seed: populate lastMeaningfulSeries immediately from the server-pushed 7d
+    // payload so the guard has data before the first range fetch completes.
+    // Once set (non-null) this effect short-circuits and never loops.
+    $effect(() => {
+        if (lastMeaningfulSeries !== null) return;
+        const prices =
+            coin.chartPrices7d?.length > 1
+                ? coin.chartPrices7d
+                : coin.sparkline7d?.length > 1
+                  ? coin.sparkline7d
+                  : null;
+        if (!prices) return;
+        const volumes =
+            coin.chartVolumes7d?.length > 1
+                ? coin.chartVolumes7d
+                : toFallbackSeries(prices, coin.totalVolume24h).volumes;
+        lastMeaningfulSeries = {
+            prices,
+            volumes,
+            timestamps: buildSyntheticTimestamps(
+                prices.length,
+                getRangeDurationHours("7d", prices.length),
+            ),
+        };
+    });
 </script>
 
 <article class="coin-chart-card">
@@ -761,7 +803,7 @@
             <svg
                 bind:this={chartSvg}
                 viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                class="coin-custom-chart"
+                class={`coin-custom-chart${chartFetchInFlight ? " chart-loading" : ""}`}
                 role="img"
                 aria-label={`${coin.name} price and volume chart`}
                 onpointermove={updateHoverFromPointer}
