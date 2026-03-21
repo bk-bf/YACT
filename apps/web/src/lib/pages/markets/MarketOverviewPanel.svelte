@@ -1,6 +1,21 @@
 <script lang="ts">
     import type { MarketsPageData } from "./markets-page.data";
     import { isCoinJitterEligible } from "../../effects/usePriceJitter.svelte";
+    import {
+        fullUsd,
+        signedPercent,
+        formatDetailedUsd,
+        formatStableCompactUsd,
+        formatTwoDecimals,
+        formatWhole,
+        displayCoinName,
+    } from "../../utils/formatters";
+    import {
+        sparklinePath,
+        chartDirectionClass,
+        SPARKLINE_WIDTH,
+        SPARKLINE_HEIGHT,
+    } from "../../utils/sparkline";
 
     type OverviewStyleVariant = "separate" | "unified" | "minimal";
 
@@ -9,17 +24,6 @@
         jitter,
         hover,
         overviewStyle,
-        formatJitterUsd,
-        formatStableCompactUsd,
-        formatTwoDecimals,
-        formatWhole,
-        fullUsd,
-        signedPercent,
-        marketCapDirectionClass,
-        sparklinePath,
-        sparklineWidth,
-        sparklineHeight,
-        displayCoinName,
     }: {
         viewData: MarketsPageData;
         jitter: {
@@ -32,18 +36,20 @@
             leave: () => void;
         };
         overviewStyle: OverviewStyleVariant;
-        formatJitterUsd: (key: string, base: number) => string;
-        formatStableCompactUsd: (v: number | null | undefined) => string;
-        formatTwoDecimals: (v: number | null | undefined) => string;
-        formatWhole: (v: number | null | undefined) => string;
-        fullUsd: Intl.NumberFormat;
-        signedPercent: Intl.NumberFormat;
-        marketCapDirectionClass: () => string;
-        sparklinePath: (points: number[]) => string;
-        sparklineWidth: number;
-        sparklineHeight: number;
-        displayCoinName: (name: string) => string;
     } = $props();
+
+    function formatJitterUsd(key: string, base: number): string {
+        return formatDetailedUsd(jitter.getValue(key, base));
+    }
+
+    function marketCapDirectionClass(): "chart-positive" | "chart-negative" {
+        return viewData.global.marketCapChangePercentage24hUsd >= 0
+            ? "chart-positive"
+            : "chart-negative";
+    }
+
+    const sparklineWidth = SPARKLINE_WIDTH;
+    const sparklineHeight = SPARKLINE_HEIGHT;
 </script>
 
 <section class={`market-overview market-overview--${overviewStyle}`}>
