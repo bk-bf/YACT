@@ -96,6 +96,21 @@ export function hasMeaningfulMarketsPayload(payload: ReturnType<typeof normalize
     );
 }
 
+// Module-level cache — persists across SvelteKit client-side navigations.
+// Written by +page.ts and MarketsPageView on every successful fetch.
+// Read by +page.ts to serve stale data instantly and avoid zero-state flash.
+let _marketsDataCache: MarketsPageData | null = null;
+
+export function getMarketsDataCache(): MarketsPageData | null {
+    return _marketsDataCache;
+}
+
+export function setMarketsDataCache(data: MarketsPageData): void {
+    if (hasMeaningfulMarketsPayload(data)) {
+        _marketsDataCache = data;
+    }
+}
+
 export function createEmptyMarketsPageData(): MarketsPageData {
     return normalizeMarketsPayload(null);
 }

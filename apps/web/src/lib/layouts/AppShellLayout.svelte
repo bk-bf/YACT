@@ -1,6 +1,7 @@
 <script lang="ts">
     import { browser } from "$app/environment";
     import { navigating, page } from "$app/stores";
+    import RouteProgress from "../components/RouteProgress.svelte";
 
     interface GlobalMarketSummary {
         totalMarketCapUsd: number;
@@ -94,10 +95,9 @@
     const displayGlobal = $derived(effectiveGlobal ?? NULL_GLOBAL);
     const isGlobalReady = $derived(effectiveGlobal !== null);
     const topbarHeadlines = $derived(
-        (
-            sharedHeadlines.length > 0
-                ? sharedHeadlines
-                : (($page.data?.headlines as CryptoHeadline[] | undefined) ?? [])
+        (sharedHeadlines.length > 0
+            ? sharedHeadlines
+            : (($page.data?.headlines as CryptoHeadline[] | undefined) ?? [])
         ).slice(0, 5),
     );
 
@@ -378,12 +378,7 @@
 </script>
 
 <div class="app-shell">
-    <div
-        class={`route-progress ${$navigating ? "active" : ""}`}
-        aria-hidden="true"
-    >
-        <span class="route-progress-bar"></span>
-    </div>
+    <RouteProgress />
 
     <section
         class={`market-floating-bar${isGlobalReady ? "" : " market-floating-bar--loading"}`}
@@ -397,14 +392,10 @@
                 )}</span
             >
             <span class="market-floating-item"
-                >Exchanges: {formatInteger(
-                    displayGlobal.totalExchanges,
-                )}</span
+                >Exchanges: {formatInteger(displayGlobal.totalExchanges)}</span
             >
             <span class="market-floating-item"
-                >Market Cap: {formatCompactUsd(
-                    displayGlobal.totalMarketCapUsd,
-                )}
+                >Market Cap: {formatCompactUsd(displayGlobal.totalMarketCapUsd)}
                 <span
                     class={displayGlobal.marketCapChangePercentage24hUsd >= 0
                         ? "positive"
@@ -415,9 +406,7 @@
                 ></span
             >
             <span class="market-floating-item"
-                >24h Vol: {formatCompactUsd(
-                    displayGlobal.totalVolumeUsd,
-                )}</span
+                >24h Vol: {formatCompactUsd(displayGlobal.totalVolumeUsd)}</span
             >
             <span class="market-floating-item"
                 >Dominance: BTC {formatOneDecimalPercent(
