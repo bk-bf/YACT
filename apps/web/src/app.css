@@ -457,19 +457,13 @@ a {
     display: grid;
     gap: 0;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    border-bottom: 1px solid var(--color-divider);
 }
 
 .overview-stat-card,
 .overview-list-card {
-    border: 0;
-    border-right: 1px solid var(--color-divider);
+    border: none;
     padding: var(--space-4);
     background: transparent;
-}
-
-.overview-grid>article:last-child {
-    border-right: 0;
 }
 
 .overview-stat-card h3,
@@ -1312,12 +1306,7 @@ a {
     }
 
     .overview-grid>article {
-        border-right: 0;
-        border-bottom: 1px solid var(--color-divider);
-    }
-
-    .overview-grid>article:last-child {
-        border-bottom: 0;
+        border: none;
     }
 
     .top-nav-main {
